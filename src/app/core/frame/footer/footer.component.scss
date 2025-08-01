@@ -1,0 +1,19 @@
+.footer {
+    background-color: var(--mat-sys-surface);
+    border-top: 1px solid var(--mat-sys-outline-variant);
+    margin-top: auto;
+}
+
+.text-primary {
+    color: var(--mat-sys-primary);
+}
+
+a:hover {
+    color: var(--mat-sys-primary);
+}
+
+@media (max-width: 768px) {
+    .footer .max-w-7xl {
+        padding: 1rem;
+    }
+}
