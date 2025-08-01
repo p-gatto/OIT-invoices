@@ -1,0 +1,63 @@
+.sidebar-content {
+    width: 256px;
+    background-color: var(--mat-sys-surface-container);
+}
+
+.menu-item {
+    margin-bottom: 4px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.menu-item:hover {
+    background-color: var(--mat-sys-surface-container-high);
+}
+
+.active-menu-item {
+    background-color: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+}
+
+.active-menu-item .menu-icon {
+    color: var(--mat-sys-on-secondary-container);
+}
+
+.menu-icon {
+    color: var(--mat-sys-on-surface-variant);
+    margin-right: 12px;
+}
+
+.menu-label {
+    color: var(--mat-sys-on-surface);
+    font-weight: 500;
+}
+
+.badge {
+    background-color: var(--mat-sys-error);
+    color: var(--mat-sys-on-error);
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+mat-nav-list {
+    padding: 0;
+}
+
+mat-list-item {
+    height: 48px;
+}
+
+.text-primary {
+    color: var(--mat-sys-primary);
+}
+
+.text-on-primary {
+    color: var(--mat-sys-on-primary);
+}
+
+.bg-primary {
+    background-color: var(--mat-sys-primary);
+}
