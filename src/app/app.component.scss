@@ -1,0 +1,17 @@
+.app-container {
+    height: 100vh;
+}
+
+mat-sidenav-container {
+    background-color: var(--mat-sys-surface);
+}
+
+mat-sidenav {
+    border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+@media (max-width: 768px) {
+    main {
+        padding: 1rem;
+    }
+}
