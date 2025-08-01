@@ -1,0 +1,54 @@
+<mat-toolbar class="header-toolbar shadow-sm border-b border-outline-variant">
+    <div class="flex items-center justify-between w-full">
+        <!-- Left Section -->
+        <div class="flex items-center gap-2">
+            <!-- Menu Button (Mobile) -->
+            <button mat-icon-button class="md:hidden" (click)="menuClick.emit()" aria-label="Menu">
+                <mat-icon>menu</mat-icon>
+            </button>
+
+            <!-- Sidebar Toggle (Desktop) -->
+            <button mat-icon-button class="hidden md:flex" (click)="toggleSidebar.emit()" aria-label="Toggle sidebar">
+                <mat-icon>{{ sidebarOpen() ? 'menu_open' : 'menu' }}</mat-icon>
+            </button>
+
+            <!-- Logo & Title -->
+            <div class="flex items-center gap-3 ml-2">
+                <mat-icon class="text-primary text-2xl">receipt_long</mat-icon>
+                <h1 class="text-xl font-semibold text-on-surface hidden sm:block">
+                    Invoice Manager
+                </h1>
+            </div>
+        </div>
+
+        <!-- Right Section -->
+        <div class="flex items-center gap-2">
+            <!-- Notifications -->
+            <button mat-icon-button [matBadge]="notificationCount()" [matBadgeHidden]="notificationCount() === 0"
+                matBadgeColor="warn" matBadgeSize="small" aria-label="Notifications">
+                <mat-icon>notifications</mat-icon>
+            </button>
+
+            <!-- User Menu -->
+            <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="User menu">
+                <mat-icon>account_circle</mat-icon>
+            </button>
+
+            <mat-menu #userMenu="matMenu" xPosition="before">
+                <button mat-menu-item>
+                    <mat-icon>person</mat-icon>
+                    <span>Profilo</span>
+                </button>
+                <button mat-menu-item>
+                    <mat-icon>settings</mat-icon>
+                    <span>Impostazioni</span>
+                </button>
+                <mat-divider></mat-divider>
+                <button mat-menu-item>
+                    <mat-icon>logout</mat-icon>
+                    <span>Logout</span>
+                </button>
+            </mat-menu>
+        </div>
+    </div>
+</mat-toolbar>

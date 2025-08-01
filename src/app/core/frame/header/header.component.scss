@@ -1,0 +1,20 @@
+.header-toolbar {
+    background-color: var(--mat-sys-surface);
+    color: var(--mat-sys-on-surface);
+    min-height: 64px;
+    padding: 0 16px;
+}
+
+.header-toolbar mat-icon {
+    color: var(--mat-sys-on-surface-variant);
+}
+
+.text-primary {
+    color: var(--mat-sys-primary);
+}
+
+@media (max-width: 640px) {
+    .header-toolbar {
+        padding: 0 8px;
+    }
+}
