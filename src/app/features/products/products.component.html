@@ -1,4 +1,4 @@
-<div class="page-container animate-fade-in">
+<!-- <div class="page-container animate-fade-in">
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-on-surface mb-2">Prodotti</h1>
         <p class="text-on-surface-variant">Gestisci i tuoi prodotti e servizi</p>
@@ -19,4 +19,128 @@
             </button>
         </mat-card-content>
     </mat-card>
-</div>
+</div> -->
+
+
+<div class="products-container animate-fade-in">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-on-surface mb-2">Prodotti</h1>
+            <p class="text-on-surface-variant">Gestisci i tuoi prodotti e servizi</p>
+        </div>
+        <button mat-raised-button color="primary" (click)="openProductDialog()">
+            <mat-icon>add</mat-icon>
+            Nuovo Prodotto
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <mat-card class="mb-6 surface-container">
+        <mat-card-content class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <mat-form-field appearance="outline">
+                    <mat-label>Cerca prodotto</mat-label>
+                    <input matInput [(ngModel)]="searchQuery" (input)="applyFilter()"
+                        placeholder="Nome, descrizione o categoria">
+                    <mat-icon matSuffix>search</mat-icon>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Categoria</mat-label>
+                    <mat-select [(value)]="selectedCategory" (selectionChange)="applyFilter()">
+                        <mat-option value="">Tutte le categorie</mat-option>
+                        @for (category of categories(); track category.name) {
+                        <mat-option [value]="category.name">
+                            {{ category.name }} ({{ category.count }})
+                        </mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
+
+                <div class="flex items-end">
+                    <button mat-outlined-button (click)="clearFilters()" class="h-12">
+                        <mat-icon>clear</mat-icon>
+                        Pulisci filtri
+                    </button>
+                </div>
+            </div>
+        </mat-card-content>
+    </mat-card>
+
+    <!-- Products Table/Grid -->
+    <mat-card class="surface-container">
+        <mat-card-content class="p-0">
+            @if (filteredProducts().length > 0) {
+            <div class="overflow-x-auto">
+                <table mat-table [dataSource]="filteredProducts()" class="w-full">
+                    <!-- Name Column -->
+                    <ng-container matColumnDef="name">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Prodotto</th>
+                        <td mat-cell *matCellDef="let product">
+                            <div>
+                                <p class="font-medium text-on-surface">{{ product.name }}</p>
+                                <p class="text-sm text-on-surface-variant">{{ product.description || 'Nessuna
+                                    descrizione' }}</p>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Category Column -->
+                    <ng-container matColumnDef="category">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Categoria</th>
+                        <td mat-cell *matCellDef="let product">
+                            @if (product.category) {
+                            <mat-chip class="text-xs">{{ product.category }}</mat-chip>
+                            } @else {
+                            <span class="text-on-surface-variant text-sm">Non specificata</span>
+                            }
+                        </td>
+                    </ng-container>
+
+                    <!-- Price Column -->
+                    <ng-container matColumnDef="price">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Prezzo</th>
+                        <td mat-cell *matCellDef="let product">
+                            <p class="font-medium text-on-surface">€{{ product.unit_price | number:'1.2-2' }}</p>
+                            <p class="text-sm text-on-surface-variant">per {{ product.unit }}</p>
+                        </td>
+                    </ng-container>
+
+                    <!-- Tax Rate Column -->
+                    <ng-container matColumnDef="tax_rate">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">IVA</th>
+                        <td mat-cell *matCellDef="let product">
+                            <span class="text-on-surface">{{ product.tax_rate }}%</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Unit Column -->
+                    <ng-container matColumnDef="unit">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Unità</th>
+                        <td mat-cell *matCellDef="let product">
+                            <span class="text-on-surface">{{ product.unit }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Actions Column -->
+                    <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Azioni</th>
+                        <td mat-cell *matCellDef="let product">
+                            <button mat-icon-button [matMenuTriggerFor]="actionsMenu"
+                                [matMenuTriggerData]="{product: product}">
+                                <mat-icon>more_vert</mat-icon>
+                            </button>
+                        </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                    <tr mat-row *matRowDef="let product; columns: displayedColumns;"
+                        class="hover:bg-surface-container-high cursor-pointer"></tr>
+                </table>
+            </div>
+            } @else {
+            <div class="text-center py-16">
+                <mat-icon class=""></mat-icon>
+            </div>
+            }
