@@ -1,0 +1,33 @@
+.invoice-detail-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.invoice-card {
+    box-shadow: var(--mat-sys-elevation-2);
+}
+
+table {
+    border-collapse: collapse;
+}
+
+.text-error {
+    color: var(--mat-sys-error);
+}
+
+@media (max-width: 768px) {
+    .invoice-detail-container {
+        padding: 1rem;
+    }
+}
+
+@media print {
+    .invoice-detail-container {
+        padding: 0;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+}
