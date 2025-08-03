@@ -1,0 +1,151 @@
+<div class="dashboard-container animate-fade-in">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-on-surface mb-2">Dashboard</h1>
+        <p class="text-on-surface-variant">Panoramica della tua attività di fatturazione</p>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Revenue -->
+        <mat-card class="stats-card surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 rounded-lg bg-primary/10">
+                        <mat-icon class="text-primary">euro</mat-icon>
+                    </div>
+                    <span class="text-sm text-on-surface-variant">+12.5%</span>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    €{{ stats().totalRevenue | number:'1.2-2' }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">Fatturato totale</p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Total Invoices -->
+        <mat-card class="stats-card surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 rounded-lg bg-secondary/10">
+                        <mat-icon class="text-secondary">receipt_long</mat-icon>
+                    </div>
+                    <span class="text-sm text-on-surface-variant">+8.2%</span>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    {{ stats().totalInvoices }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">Fatture totali</p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Pending Invoices -->
+        <mat-card class="stats-card surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 rounded-lg bg-orange-100">
+                        <mat-icon class="text-orange-600">schedule</mat-icon>
+                    </div>
+                    <span class="text-sm text-on-surface-variant">-3.1%</span>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    {{ stats().pendingInvoices }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">In attesa</p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Customers -->
+        <mat-card class="stats-card surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 rounded-lg bg-green-100">
+                        <mat-icon class="text-green-600">people</mat-icon>
+                    </div>
+                    <span class="text-sm text-on-surface-variant">+5.4%</span>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    {{ stats().totalCustomers }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">Clienti attivi</p>
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Quick Actions & Recent Items -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Quick Actions -->
+        <mat-card class="surface-container">
+            <mat-card-header>
+                <mat-card-title class="text-on-surface">Azioni rapide</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <button mat-raised-button color="primary" routerLink="/invoices/new" class="h-16 flex-col">
+                        <mat-icon>add</mat-icon>
+                        <span class="mt-1 text-sm">Nuova Fattura</span>
+                    </button>
+
+                    <button mat-outlined-button routerLink="/customers/new" class="h-16 flex-col">
+                        <mat-icon>person_add</mat-icon>
+                        <span class="mt-1 text-sm">Nuovo Cliente</span>
+                    </button>
+
+                    <button mat-outlined-button routerLink="/invoices?status=pending" class="h-16 flex-col">
+                        <mat-icon>schedule</mat-icon>
+                        <span class="mt-1 text-sm">In Attesa</span>
+                    </button>
+
+                    <button mat-outlined-button routerLink="/reports" class="h-16 flex-col">
+                        <mat-icon>analytics</mat-icon>
+                        <span class="mt-1 text-sm">Report</span>
+                    </button>
+                </div>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Recent Invoices -->
+        <mat-card class="surface-container">
+            <mat-card-header class="flex justify-between items-center">
+                <mat-card-title class="text-on-surface">Fatture recenti</mat-card-title>
+                <button mat-button routerLink="/invoices" class="text-primary">
+                    Vedi tutte
+                </button>
+            </mat-card-header>
+            <mat-card-content class="p-6">
+                @if (recentInvoices().length > 0) {
+                <div class="space-y-4">
+                    @for (invoice of recentInvoices(); track invoice.id) {
+                    <div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-high cursor-pointer"
+                        (click)="navigateToInvoice(invoice.id!)">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <mat-icon class="text-primary text-sm">receipt</mat-icon>
+                            </div>
+                            <div>
+                                <p class="font-medium text-on-surface">{{ invoice.invoice_number }}</p>
+                                <p class="text-sm text-on-surface-variant">{{ invoice.customer?.name }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-medium text-on-surface">€{{ invoice.total | number:'1.2-2' }}</p>
+                            <mat-chip [class]="getStatusClass(invoice.status)" class="text-xs">
+                                {{ getStatusLabel(invoice.status) }}
+                            </mat-chip>
+                        </div>
+                    </div>
+                    }
+                </div>
+                } @else {
+                <div class="text-center py-8">
+                    <mat-icon class="text-6xl text-on-surface-variant mb-4">receipt_long</mat-icon>
+                    <p class="text-on-surface-variant mb-4">Nessuna fattura ancora creata</p>
+                    <button mat-raised-button color="primary" routerLink="/invoices/new">
+                        Crea la prima fattura
+                    </button>
+                </div>
+                }
+            </mat-card-content>
+        </mat-card>
+    </div>
+</div>
