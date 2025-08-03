@@ -1,0 +1,53 @@
+<div class="register-container flex items-center justify-center min-h-screen bg-surface">
+    <mat-card class="surface-container w-full max-w-md p-6 shadow-lg rounded-lg">
+        <mat-card-header class="text-center block mb-6">
+            <mat-icon class="text-primary text-6xl mb-2">person_add</mat-icon>
+            <mat-card-title class="text-3xl font-bold text-on-surface">Registrati</mat-card-title>
+            <mat-card-subtitle class="text-on-surface-variant">Crea il tuo account</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+            <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-6">
+                <mat-form-field appearance="outline" class="w-full">
+                    <mat-label>Email</mat-label>
+                    <input matInput formControlName="email" type="email" placeholder="Inserisci la tua email" required>
+                    @if (registerForm.get('email')?.hasError('required') && registerForm.get('email')?.touched) {
+                    <mat-error>L'email è obbligatoria</mat-error>
+                    }
+                    @if (registerForm.get('email')?.hasError('email') && registerForm.get('email')?.touched) {
+                    <mat-error>Inserisci un'email valida</mat-error>
+                    }
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="w-full">
+                    <mat-label>Password</mat-label>
+                    <input matInput formControlName="password" [type]="hidePassword() ? 'password' : 'text'"
+                        placeholder="Crea una password" required>
+                    <button mat-icon-button matSuffix (click)="hidePassword.set(!hidePassword())" type="button">
+                        <mat-icon>{{hidePassword() ? 'visibility_off' : 'visibility'}}</mat-icon>
+                    </button>
+                    @if (registerForm.get('password')?.hasError('required') && registerForm.get('password')?.touched) {
+                    <mat-error>La password è obbligatoria</mat-error>
+                    }
+                    @if (registerForm.get('password')?.hasError('minlength') && registerForm.get('password')?.touched) {
+                    <mat-error>La password deve essere di almeno 6 caratteri</mat-error>
+                    }
+                </mat-form-field>
+
+                <button mat-raised-button color="primary" class="w-full h-12 text-lg"
+                    [disabled]="registerForm.invalid || loading()" type="submit">
+                    @if (loading()) {
+                    <mat-icon class="animate-spin">hourglass_empty</mat-icon>
+                    <span>Registrazione in corso...</span>
+                    } @else {
+                    <span>Registrati</span>
+                    }
+                </button>
+            </form>
+            <div class="text-center mt-6">
+                <p class="text-on-surface-variant">Hai già un account?
+                    <a routerLink="/login" class="text-primary hover:underline">Accedi qui</a>
+                </p>
+            </div>
+        </mat-card-content>
+    </mat-card>
+</div>
