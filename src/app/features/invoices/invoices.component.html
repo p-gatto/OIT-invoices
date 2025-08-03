@@ -1,0 +1,182 @@
+<div class="invoice-list-container animate-fade-in">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-on-surface mb-2">Fatture</h1>
+            <p class="text-on-surface-variant">Gestisci tutte le tue fatture</p>
+        </div>
+        <button mat-raised-button color="primary" routerLink="/invoices/new" class="flex items-center gap-2">
+            <mat-icon>add</mat-icon>
+            Nuova Fattura
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <mat-card class="mb-6 surface-container">
+        <mat-card-content class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <mat-form-field appearance="outline">
+                    <mat-label>Cerca fattura</mat-label>
+                    <input matInput [(ngModel)]="searchQuery" (input)="applyFilters()"
+                        placeholder="Numero fattura o cliente">
+                    <mat-icon matSuffix>search</mat-icon>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Stato</mat-label>
+                    <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
+                        <mat-option value="">Tutti</mat-option>
+                        <mat-option value="draft">Bozza</mat-option>
+                        <mat-option value="sent">Inviata</mat-option>
+                        <mat-option value="paid">Pagata</mat-option>
+                        <mat-option value="overdue">Scaduta</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Anno</mat-label>
+                    <mat-select [(ngModel)]="yearFilter" (selectionChange)="applyFilters()">
+                        <mat-option value="">Tutti</mat-option>
+                        @for (year of availableYears(); track year) {
+                        <mat-option [value]="year">{{ year }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
+
+                <div class="flex items-end">
+                    <button mat-outlined-button (click)="clearFilters()" class="w-full">
+                        <mat-icon>clear</mat-icon>
+                        Pulisci filtri
+                    </button>
+                </div>
+            </div>
+        </mat-card-content>
+    </mat-card>
+
+    <!-- Invoices Table -->
+    <mat-card class="surface-container">
+        <mat-card-content class="p-0">
+            @if (filteredInvoices().length > 0) {
+            <div class="overflow-x-auto">
+                <table mat-table [dataSource]="filteredInvoices()" class="w-full">
+                    <!-- Invoice Number Column -->
+                    <ng-container matColumnDef="invoice_number">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Numero</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <div class="flex items-center gap-2">
+                                <mat-icon class="text-primary">receipt</mat-icon>
+                                <span class="font-medium">{{ invoice.invoice_number }}</span>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Customer Column -->
+                    <ng-container matColumnDef="customer">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Cliente</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <div>
+                                <p class="font-medium">{{ invoice.customer?.name }}</p>
+                                <p class="text-sm text-on-surface-variant">{{ invoice.customer?.email }}</p>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Date Column -->
+                    <ng-container matColumnDef="date">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Data</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <div>
+                                <p>{{ invoice.issue_date | date:'dd/MM/yyyy' }}</p>
+                                @if (invoice.due_date) {
+                                <p class="text-sm text-on-surface-variant">
+                                    Scad: {{ invoice.due_date | date:'dd/MM/yyyy' }}
+                                </p>
+                                }
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Amount Column -->
+                    <ng-container matColumnDef="amount">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold text-right">Importo</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <div class="text-right">
+                                <p class="font-bold">€{{ invoice.total | number:'1.2-2' }}</p>
+                                <p class="text-sm text-on-surface-variant">
+                                    IVA: €{{ invoice.tax_amount | number:'1.2-2' }}
+                                </p>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Status Column -->
+                    <ng-container matColumnDef="status">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Stato</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <mat-chip [class]="getStatusClass(invoice.status)">
+                                {{ getStatusLabel(invoice.status) }}
+                            </mat-chip>
+                        </td>
+                    </ng-container>
+
+                    <!-- Actions Column -->
+                    <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Azioni</th>
+                        <td mat-cell *matCellDef="let invoice">
+                            <button mat-icon-button [matMenuTriggerFor]="actionsMenu"
+                                [matMenuTriggerData]="{invoice: invoice}">
+                                <mat-icon>more_vert</mat-icon>
+                            </button>
+                        </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                    <tr mat-row *matRowDef="let invoice; columns: displayedColumns;"
+                        class="hover:bg-surface-container-high cursor-pointer" (click)="viewInvoice(invoice.id!)"></tr>
+                </table>
+            </div>
+            } @else {
+            <div class="text-center py-16">
+                <mat-icon class="text-8xl text-on-surface-variant mb-4">receipt_long</mat-icon>
+                <h3 class="text-xl font-semibold text-on-surface mb-2">
+                    Nessuna fattura trovata
+                </h3>
+                <p class="text-on-surface-variant mb-6">
+                    Inizia creando la tua prima fattura
+                </p>
+                <button mat-raised-button color="primary" routerLink="/invoices/new">
+                    <mat-icon>add</mat-icon>
+                    Crea Fattura
+                </button>
+            </div>
+            }
+        </mat-card-content>
+    </mat-card>
+
+    <!-- Actions Menu -->
+    <mat-menu #actionsMenu="matMenu">
+        <ng-template matMenuContent let-invoice="invoice">
+            <button mat-menu-item (click)="viewInvoice(invoice.id)">
+                <mat-icon>visibility</mat-icon>
+                <span>Visualizza</span>
+            </button>
+            <button mat-menu-item (click)="editInvoice(invoice.id)">
+                <mat-icon>edit</mat-icon>
+                <span>Modifica</span>
+            </button>
+            <button mat-menu-item (click)="duplicateInvoice(invoice)">
+                <mat-icon>content_copy</mat-icon>
+                <span>Duplica</span>
+            </button>
+            <button mat-menu-item (click)="downloadPDF(invoice)">
+                <mat-icon>download</mat-icon>
+                <span>Scarica PDF</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="deleteInvoice(invoice)" class="text-error">
+                <mat-icon>delete</mat-icon>
+                <span>Elimina</span>
+            </button>
+        </ng-template>
+    </mat-menu>
+</div>

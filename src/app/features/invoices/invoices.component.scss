@@ -1,0 +1,19 @@
+.invoice-list-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.mat-mdc-table {
+    width: 100%;
+}
+
+.mat-mdc-row:hover {
+    background-color: var(--mat-sys-surface-container-high);
+}
+
+@media (max-width: 768px) {
+    .invoice-list-container {
+        padding: 1rem;
+    }
+}
