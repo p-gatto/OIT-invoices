@@ -1,0 +1,72 @@
+<h2 mat-dialog-title>{{ data ? 'Modifica Prodotto' : 'Nuovo Prodotto' }}</h2>
+<form [formGroup]="productForm" (ngSubmit)="onSubmit()">
+    <mat-dialog-content class="space-y-4">
+        <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Nome</mat-label>
+            <input matInput formControlName="name" required>
+            <mat-error *ngIf="productForm.get('name')?.hasError('required')">
+                Il nome è obbligatorio
+            </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Descrizione</mat-label>
+            <textarea matInput formControlName="description" rows="3"></textarea>
+        </mat-form-field>
+
+        <div class="grid grid-cols-2 gap-4">
+            <mat-form-field appearance="outline">
+                <mat-label>Prezzo unitario</mat-label>
+                <input matInput type="number" formControlName="unit_price" step="0.01" required>
+                <span matTextPrefix>€&nbsp;</span>
+                <mat-error *ngIf="productForm.get('unit_price')?.hasError('required')">
+                    Il prezzo è obbligatorio
+                </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+                <mat-label>Aliquota IVA</mat-label>
+                <mat-select formControlName="tax_rate">
+                    <mat-option value="0">0%</mat-option>
+                    <mat-option value="4">4%</mat-option>
+                    <mat-option value="10">10%</mat-option>
+                    <mat-option value="22">22%</mat-option>
+                </mat-select>
+            </mat-form-field>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <mat-form-field appearance="outline">
+                <mat-label>Categoria</mat-label>
+                <input matInput formControlName="category" list="categories">
+                <datalist id="categories">
+                    <option value="Servizi">
+                    <option value="Prodotti">
+                    <option value="Licenze">
+                    <option value="Consulenza">
+                    <option value="Hosting">
+                </datalist>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+                <mat-label>Unità di misura</mat-label>
+                <mat-select formControlName="unit">
+                    <mat-option value="pz">Pezzo</mat-option>
+                    <mat-option value="ore">Ore</mat-option>
+                    <mat-option value="kg">Chilogrammi</mat-option>
+                    <mat-option value="m">Metro</mat-option>
+                    <mat-option value="mq">Metro quadro</mat-option>
+                    <mat-option value="giorni">Giorni</mat-option>
+                    <mat-option value="mesi">Mesi</mat-option>
+                </mat-select>
+            </mat-form-field>
+        </div>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end">
+        <button mat-button type="button" (click)="onCancel()">Annulla</button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="productForm.invalid">
+            {{ data ? 'Aggiorna' : 'Crea' }}
+        </button>
+    </mat-dialog-actions>
+</form>
