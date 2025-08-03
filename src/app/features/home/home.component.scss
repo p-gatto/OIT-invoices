@@ -1,0 +1,31 @@
+.home-container {
+    /* Calcola l'altezza per riempire lo spazio disponibile, escludendo header e footer */
+    min-height: calc(100vh - 64px - 64px);
+    /* Esempio: 64px per header e 64px per footer */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--mat-sys-surface);
+}
+
+mat-card {
+    border-radius: var(--material-lg);
+}
+
+@media (max-width: 640px) {
+    .home-container {
+        padding: 1rem;
+    }
+
+    mat-card {
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    p {
+        font-size: 1rem;
+    }
+}

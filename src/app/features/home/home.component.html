@@ -1,0 +1,24 @@
+<div class="home-container flex items-center justify-center min-h-[calc(100vh-128px)] bg-surface">
+    <mat-card class="surface-container w-full max-w-3xl p-8 text-center shadow-lg rounded-lg">
+        <mat-card-content>
+            <mat-icon class="text-primary text-8xl mb-4">receipt_long</mat-icon>
+            <h1 class="text-4xl font-bold text-on-surface mb-4">
+                Benvenuto in Invoice Manager
+            </h1>
+            <p class="text-lg text-on-surface-variant mb-8">
+                La tua soluzione completa per la gestione delle fatture elettroniche.
+                Crea, gestisci e monitora le tue fatture in modo semplice ed efficiente.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button mat-raised-button color="primary" routerLink="/login" class="h-14 text-lg">
+                    <mat-icon>login</mat-icon>
+                    Accedi
+                </button>
+                <button mat-stroked-button color="primary" routerLink="/register" class="h-14 text-lg">
+                    <mat-icon>person_add</mat-icon>
+                    Registrati
+                </button>
+            </div>
+        </mat-card-content>
+    </mat-card>
+</div>
