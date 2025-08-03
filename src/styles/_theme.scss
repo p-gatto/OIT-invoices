@@ -1,0 +1,47 @@
+@use "sass:map";
+@use "sass:list";
+
+@mixin create($primary: blue, $accent: pink, $scheme: light dark) {
+    --theme-primary: #{$primary};
+    --theme-accent: #{$accent};
+    color-scheme: #{$scheme};
+}
+
+@mixin _gray-entries($levels) {
+    @each $key, $lightness in $levels {
+        --color-gray-#{$key}: oklch(#{$lightness} 0 0);
+    }
+}
+
+@mixin _relative-color-entries($prefix, $base, $levels) {
+    @each $key, $values in $levels {
+        $lightness: map.get($values, l);
+        $chroma: map.get($values, c);
+        --color-#{$prefix}-#{$key}: oklch(from #{$base} #{$lightness} #{$chroma} h);
+    }
+}
+
+@mixin _palette-entries($prefix, $entry-base, $levels) {
+    $keys: map.keys($levels);
+    $length: list.length($keys);
+
+    @for $i from 1 through $length {
+        $light-key: list.nth($keys, $i);
+        $dark-key: list.nth($keys, -$i);
+
+        $light-color: var(--color-#{$entry-base}-#{$light-key});
+        $dark-color: var(--color-#{$entry-base}-#{$dark-key});
+        --#{$prefix}-#{$light-key}: light-dark(#{$light-color}, #{$dark-color});
+    }
+}
+
+@mixin color-system($gray-levels, $primary-levels, $accent-levels) {
+    * {
+        @include _gray-entries($gray-levels);
+        @include _relative-color-entries("primary", var(--theme-primary), $primary-levels);
+        @include _relative-color-entries("accent", var(--theme-accent), $accent-levels);
+        @include _palette-entries("n", "gray", $gray-levels);
+        @include _palette-entries("p", "primary", $primary-levels);
+        @include _palette-entries("a", "accent", $accent-levels);
+    }
+}

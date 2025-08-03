@@ -4,41 +4,50 @@
 
 @use "tailwindcss";
 
-@use './styles/theme';
-@use './styles/levels';
 // Include Material Design 3 Theme
 @include mat.core();
 
-@include theme.color-system(levels.$gray-levels, levels.$primary-levels, levels.$accent-levels);
+// Define Material Design 3 Color Palette
+$primary-palette: mat.define-palette(mat.$azure-palette);
+$accent-palette: mat.define-palette(mat.$blue-palette);
+$warn-palette: mat.define-palette(mat.$red-palette);
 
+// Create Material Design 3 Theme
+$light-theme: mat.define-theme((color: (theme-type: light,
+        primary: $primary-palette,
+        tertiary: $accent-palette,
+        use-system-variables: true,
+      ),
+      typography: (brand-family: 'Inter, system-ui, sans-serif',
+        plain-family: 'Inter, system-ui, sans-serif',
+      ),
+      density: (scale: 0,
+      )));
+
+$dark-theme: mat.define-theme((color: (theme-type: dark,
+        primary: $primary-palette,
+        tertiary: $accent-palette,
+        use-system-variables: true,
+      ),
+      typography: (brand-family: 'Inter, system-ui, sans-serif',
+        plain-family: 'Inter, system-ui, sans-serif',
+      ),
+      density: (scale: 0,
+      )));
+
+// Apply the theme
 :root {
-
-  @include theme.create($primary: blue, $accent: pink, $scheme: light);
-
-  // Shadows
-  --shadow-light: rgba(0, 0, 0, 0.05);
-  --shadow-medium: rgba(0, 0, 0, 0.1);
-  --shadow-dark: rgba(0, 0, 0, 0.15);
-
-  // Special colors
-  --foreground-translucent: rgb(from var(--n-0)r g b / 0.6);
-
-  @include mat.toolbar-overrides((container-background-color: var(--n-20),
-      container-text-color: var(--n-70),
-    ));
-
-  @include mat.chips-overrides((label-text-color: var(--n-70),
-      outline-color: var(--n-70),
-    ));
-
+  @include mat.all-component-themes($light-theme);
+  @include mat.system-level-colors($light-theme);
+  @include mat.system-level-typography($light-theme);
 }
 
-.theme-2 {
-  @include theme.create($primary: purple, $accent: orange, $scheme: dark);
-}
-
-.theme-3 {
-  @include theme.create($primary: green, $accent: brown, $scheme: light);
+// Dark theme media query
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include mat.all-component-colors($dark-theme);
+    @include mat.system-level-colors($dark-theme);
+  }
 }
 
 // Global Styles
@@ -75,11 +84,6 @@ body {
   border-radius: 20px !important;
 }
 
-.mat-mdc-form-field-subscript-wrapper {
-  padding: 0 !important;
-  /* Rimuove padding extra dalle mat-error */
-}
-
 // Custom Utility Classes
 .surface {
   background-color: var(--mat-sys-surface);
@@ -114,18 +118,6 @@ body {
 // Text Colors
 .text-primary {
   color: var(--mat-sys-primary) !important;
-}
-
-.text-on-primary {
-  color: var(--mat-sys-on-primary) !important;
-}
-
-.text-secondary {
-  color: var(--mat-sys-secondary) !important;
-}
-
-.text-on-secondary {
-  color: var(--mat-sys-on-secondary) !important;
 }
 
 .text-on-surface {
@@ -259,14 +251,4 @@ body {
   100% {
     background-position: 200% 0;
   }
-}
-
-html,
-body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
 }
