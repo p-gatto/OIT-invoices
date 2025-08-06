@@ -4,7 +4,7 @@ import { Observable, from, map, catchError, of, switchMap } from 'rxjs';
 
 import { SupabaseService } from '../../../app/core/database/supabase.service';
 
-import { Customer } from './customer.model';
+import { Customer } from '../customers/customer.model';
 import { Invoice } from './invoice.model';
 
 @Injectable({

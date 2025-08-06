@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { MatCardModule } from '@angular/material/card';
@@ -45,11 +45,13 @@ export class InvoicesComponent implements OnInit {
   dialog = inject(MatDialog);
   snackBar = inject(MatSnackBar);
   router = inject(Router);
+  route = inject(ActivatedRoute);
 
   invoices = signal<Invoice[]>([]);
   searchQuery = '';
   statusFilter = '';
   yearFilter = '';
+  customerIdFilter = '';
 
   displayedColumns = ['invoice_number', 'customer', 'date', 'amount', 'status', 'actions'];
 
@@ -82,6 +84,10 @@ export class InvoicesComponent implements OnInit {
       );
     }
 
+    if (this.customerIdFilter) {
+      filtered = filtered.filter(invoice => invoice.customer_id === this.customerIdFilter);
+    }
+
     return filtered;
   });
 
@@ -89,6 +95,17 @@ export class InvoicesComponent implements OnInit {
 
   ngOnInit() {
     this.loadInvoices();
+    this.checkQueryParams();
+  }
+
+  private checkQueryParams() {
+    // Verifica se c'è un customerId nei query params per filtrare
+    this.route.queryParamMap.subscribe(params => {
+      const customerId = params.get('customerId');
+      if (customerId) {
+        this.customerIdFilter = customerId;
+      }
+    });
   }
 
   private loadInvoices() {
@@ -164,7 +181,6 @@ export class InvoicesComponent implements OnInit {
     });
   }
 
-
   deleteInvoice(invoiceId: string) {
     this.invoiceService.deleteInvoice(invoiceId).subscribe({
       next: () => {
@@ -197,6 +213,14 @@ export class InvoicesComponent implements OnInit {
       'overdue': 'bg-red-100 text-red-800'
     };
     return classes[status] || 'bg-gray-100 text-gray-800';
+  }
+
+  clearCustomerFilter() {
+    this.customerIdFilter = '';
+    this.router.navigate([], {
+      queryParams: { customerId: null },
+      queryParamsHandling: 'merge'
+    });
   }
 
 }

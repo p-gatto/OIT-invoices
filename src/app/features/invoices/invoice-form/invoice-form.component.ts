@@ -15,7 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDialogModule } from '@angular/material/dialog';
 import { Invoice } from '../invoice.model';
-import { Customer } from '../customer.model';
+import { Customer } from '../../customers/customer.model';
 import { map, Observable, startWith } from 'rxjs';
 import { InvoiceService } from '../invoice.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -64,6 +64,22 @@ export class InvoiceFormComponent implements OnInit {
     this.loadCustomers();
     this.setupCustomerFilter();
     this.checkEditMode();
+    this.checkQueryParams();
+  }
+
+  private checkQueryParams() {
+    // Verifica se c'è un customerId nei query params
+    const customerId = this.route.snapshot.queryParamMap.get('customerId');
+    if (customerId) {
+      // Trova il cliente e preselezionalo
+      this.invoiceService.getCustomers().subscribe(customers => {
+        const customer = customers.find(c => c.id === customerId);
+        if (customer) {
+          this.invoiceForm.get('customer_search')?.setValue(customer);
+          this.invoiceForm.get('customer_id')?.setValue(customer.id);
+        }
+      });
+    }
   }
 
   private createForm(): FormGroup {

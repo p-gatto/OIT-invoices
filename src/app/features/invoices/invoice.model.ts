@@ -1,4 +1,4 @@
-import { Customer } from "./customer.model";
+import { Customer } from "../customers/customer.model";
 import { InvoiceItem } from "./invoice-item.model";
 
 export interface Invoice {

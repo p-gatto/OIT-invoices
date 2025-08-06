@@ -3,13 +3,33 @@
     <div class="flex justify-between items-center mb-8">
         <div>
             <h1 class="text-3xl font-bold text-on-surface mb-2">Fatture</h1>
-            <p class="text-on-surface-variant">Gestisci tutte le tue fatture</p>
+            <p class="text-on-surface-variant">
+                {{ customerIdFilter ? 'Fatture filtrate per cliente' : 'Gestisci tutte le tue fatture' }}
+            </p>
         </div>
         <button mat-raised-button color="primary" routerLink="/invoices/new" class="flex items-center gap-2">
             <mat-icon>add</mat-icon>
             Nuova Fattura
         </button>
     </div>
+
+    <!-- Customer Filter Alert -->
+    @if (customerIdFilter) {
+    <mat-card class="mb-4 surface-container bg-primary/10">
+        <mat-card-content class="p-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <mat-icon class="text-primary">filter_list</mat-icon>
+                <span class="text-on-surface">
+                    Stai visualizzando solo le fatture di un cliente specifico
+                </span>
+            </div>
+            <button mat-button (click)="clearCustomerFilter()">
+                <mat-icon>clear</mat-icon>
+                Mostra tutte
+            </button>
+        </mat-card-content>
+    </mat-card>
+    }
 
     <!-- Filters -->
     <mat-card class="mb-6 surface-container">
