@@ -139,8 +139,41 @@
                         class="hover:bg-surface-container-high cursor-pointer"></tr>
                 </table>
             </div>
+
             } @else {
             <div class="text-center py-16">
-                <mat-icon class=""></mat-icon>
+                <mat-icon class="text-8xl text-on-surface-variant mb-4">inventory_2</mat-icon>
+                <h3 class="text-xl font-semibold text-on-surface mb-2">
+                    Nessun prodotto trovato
+                </h3>
+                <p class="text-on-surface-variant mb-6">
+                    Inizia aggiungendo il tuo primo prodotto
+                </p>
+                <button mat-raised-button color="primary" (click)="openProductDialog()">
+                    <mat-icon>add</mat-icon>
+                    Aggiungi Prodotto
+                </button>
             </div>
             }
+        </mat-card-content>
+    </mat-card>
+
+    <!-- Actions Menu -->
+    <mat-menu #actionsMenu="matMenu">
+        <ng-template matMenuContent let-product="product">
+            <button mat-menu-item (click)="editProduct(product)">
+                <mat-icon>edit</mat-icon>
+                <span>Modifica</span>
+            </button>
+            <button mat-menu-item (click)="duplicateProduct(product)">
+                <mat-icon>content_copy</mat-icon>
+                <span>Duplica</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="deleteProduct(product)" class="text-error">
+                <mat-icon>delete</mat-icon>
+                <span>Elimina</span>
+            </button>
+        </ng-template>
+    </mat-menu>
+</div>

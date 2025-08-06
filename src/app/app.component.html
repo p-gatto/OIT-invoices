@@ -3,11 +3,11 @@
     <!-- Sidebar -->
     <mat-sidenav #drawer [mode]="isDesktop() ? 'side' : 'over'" [opened]="isDesktop() && sidebarOpen()"
       class="w-64 bg-surface-container">
-      <app-sidebar (menuItemClick)="drawer.close()"></app-sidebar>
+      <!-- <app-sidebar (menuItemClick)="drawer.close()"></app-sidebar> -->
       <!-- Mostra la sidebar solo se l'utente è autenticato -->
-      <!-- @if (authService.currentUser()) { 
-            <app-sidebar (menuItemClick)="drawer.close()"></app-sidebar>
-          } -->
+      @if (authService.currentUser()) {
+      <app-sidebar (menuItemClick)="drawer.close()"></app-sidebar>
+      }
     </mat-sidenav>
 
     <!-- Main Content -->

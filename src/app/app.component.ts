@@ -32,7 +32,7 @@ export class AppComponent { //implements OnInit {
 
   sidebarOpen = signal(true);
 
-  /* constructor(public authService: AuthService, private router: Router) {
+  constructor(public authService: AuthService, private router: Router) {
     // Effetto per reagire ai cambiamenti dello stato di autenticazione
     effect(() => {
       // Se l'utente non è autenticato e la sessione è stata caricata, reindirizza al login
@@ -45,8 +45,14 @@ export class AppComponent { //implements OnInit {
   ngOnInit() {
     // Inizializza lo stato della sidebar in base alla dimensione dello schermo
     this.sidebarOpen.set(this.isDesktop());
-  } */
 
+    // Listener per il resize della finestra
+    window.addEventListener('resize', () => {
+      if (!this.isDesktop() && this.sidebarOpen()) {
+        this.sidebarOpen.set(false);
+      }
+    });
+  }
 
   toggleSidebar() {
     this.sidebarOpen.update(value => !value);
@@ -55,4 +61,5 @@ export class AppComponent { //implements OnInit {
   isDesktop(): boolean {
     return window.innerWidth >= 768;
   }
+
 }
