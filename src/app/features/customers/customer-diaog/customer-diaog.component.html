@@ -1,0 +1,81 @@
+<h2 mat-dialog-title>{{ data ? 'Modifica Cliente' : 'Nuovo Cliente' }}</h2>
+<form [formGroup]="customerForm" (ngSubmit)="onSubmit()">
+    <mat-dialog-content class="space-y-4">
+        <!-- Dati Anagrafici -->
+        <div class="mb-4">
+            <h3 class="text-sm font-medium text-on-surface-variant mb-3">Dati Anagrafici</h3>
+
+            <mat-form-field appearance="outline" class="w-full mb-4">
+                <mat-label>Nome / Ragione Sociale</mat-label>
+                <input matInput formControlName="name" required>
+                <mat-icon matSuffix>person</mat-icon>
+                <mat-error *ngIf="customerForm.get('name')?.hasError('required')">
+                    Il nome è obbligatorio
+                </mat-error>
+            </mat-form-field>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <mat-form-field appearance="outline">
+                    <mat-label>Email</mat-label>
+                    <input matInput formControlName="email" type="email">
+                    <mat-icon matSuffix>email</mat-icon>
+                    <mat-error *ngIf="customerForm.get('email')?.hasError('email')">
+                        Inserisci un'email valida
+                    </mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Telefono</mat-label>
+                    <input matInput formControlName="phone" type="tel">
+                    <mat-icon matSuffix>phone</mat-icon>
+                </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Indirizzo</mat-label>
+                <textarea matInput formControlName="address" rows="2"
+                    placeholder="Via/Piazza, Numero civico, CAP, Città, Provincia"></textarea>
+                <mat-icon matSuffix>location_on</mat-icon>
+            </mat-form-field>
+        </div>
+
+        <!-- Dati Fiscali -->
+        <div>
+            <h3 class="text-sm font-medium text-on-surface-variant mb-3">Dati Fiscali</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <mat-form-field appearance="outline">
+                    <mat-label>Codice Fiscale</mat-label>
+                    <input matInput formControlName="tax_code" placeholder="RSSMRA80A01F205X" maxlength="16"
+                        style="text-transform: uppercase">
+                    <mat-icon matSuffix>badge</mat-icon>
+                    <mat-hint>16 caratteri alfanumerici</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Partita IVA</mat-label>
+                    <input matInput formControlName="vat_number" placeholder="12345678901" maxlength="11">
+                    <mat-icon matSuffix>receipt</mat-icon>
+                    <mat-hint>11 cifre numeriche</mat-hint>
+                </mat-form-field>
+            </div>
+        </div>
+
+        <!-- Note aggiuntive -->
+        <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Note</mat-label>
+            <textarea matInput formControlName="notes" rows="2"
+                placeholder="Note aggiuntive sul cliente (opzionale)"></textarea>
+            <mat-icon matSuffix>note</mat-icon>
+        </mat-form-field>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="mt-4">
+        <button mat-button type="button" (click)="onCancel()">Annulla</button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="customerForm.invalid || saving">
+            <mat-icon *ngIf="saving" class="animate-spin">hourglass_empty</mat-icon>
+            <mat-icon *ngIf="!saving">{{ data ? 'save' : 'add' }}</mat-icon>
+            {{ saving ? 'Salvataggio...' : (data ? 'Aggiorna' : 'Crea') }}
+        </button>
+    </mat-dialog-actions>
+</form>

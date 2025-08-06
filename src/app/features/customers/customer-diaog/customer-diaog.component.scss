@@ -1,0 +1,22 @@
+::ng-deep .mat-mdc-dialog-container {
+    max-width: 700px !important;
+}
+
+mat-dialog-content {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
