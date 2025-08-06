@@ -13,7 +13,22 @@ export class SupabaseService {
     constructor() {
         this.supabase = createClient(
             environment.supabaseUrl,
-            environment.supabaseKey
+            environment.supabaseKey,
+            {
+                auth: {
+                    persistSession: true,
+                    storageKey: 'sb-azmyeqtnxecnajeupawk-auth-token',
+                    storage: window.localStorage,
+                    detectSessionInUrl: true,
+                    autoRefreshToken: true,
+                    //// Aggiungi un timeout più lungo per il lock
+                    //lockAcquireTimeout: 10000, // 10 secondi invece del default
+                    //// Disabilita completamente i lock
+                    //lock: false,
+                    // Disabilita il debug per evitare log eccessivi
+                    debug: false
+                }
+            }
         );
     }
 

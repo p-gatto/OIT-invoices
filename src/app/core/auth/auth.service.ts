@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, OnDestroy, signal } from '@angular/core';
 
 import { from, Observable } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
@@ -9,7 +9,7 @@ import { SupabaseService } from '../database/supabase.service';
 @Injectable({
   providedIn: 'root'
 })
-export class AuthService {
+export class AuthService implements OnDestroy {
 
   // Signal per tenere traccia dello stato di autenticazione dell'utente
   private _currentUser = signal<User | null>(null);
@@ -20,7 +20,13 @@ export class AuthService {
   private _sessionLoaded = signal(false);
   sessionLoaded = this._sessionLoaded.asReadonly();
 
+  private authSubscription: any;
+
   constructor(private supabase: SupabaseService) {
+
+    // Pulisci eventuali lock pendenti all'avvio
+    this.cleanupLocks();
+
     // Ascolta i cambiamenti di stato dell'autenticazione di Supabase
     this.supabase.client.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       console.log('Auth event:', event, 'Session:', session);
@@ -30,7 +36,46 @@ export class AuthService {
 
     // Carica la sessione iniziale all'avvio del servizio
     this.loadInitialSession();
+
+    // Gestisci la chiusura della finestra/tab
+    window.addEventListener('beforeunload', () => this.cleanup());
   }
+
+  ngOnDestroy() {
+    this.cleanup();
+  }
+
+  private cleanup() {
+    // Pulisci la sottoscrizione se esiste
+    if (this.authSubscription) {
+      this.authSubscription.unsubscribe();
+    }
+    // Pulisci i lock
+    this.cleanupLocks();
+  }
+
+  private async cleanupLocks() {
+    try {
+      // Prova a rilasciare eventuali lock pendenti
+      if ('locks' in navigator && navigator.locks) {
+        // Questa è una workaround per forzare il rilascio dei lock
+        await navigator.locks.request(
+          'sb-azmyeqtnxecnajeupawk-auth-token',
+          { ifAvailable: true },
+          async (lock) => {
+            if (lock) {
+              // Lock acquisito e rilasciato immediatamente
+              return;
+            }
+          }
+        );
+      }
+    } catch (error) {
+      // Ignora errori nel cleanup dei lock
+      console.debug('Lock cleanup attempted:', error);
+    }
+  }
+
 
   /**
    * Carica la sessione utente iniziale.
