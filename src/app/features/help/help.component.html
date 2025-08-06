@@ -1,1 +1,76 @@
-<p>help works!</p>
+<div class="help-container animate-fade-in">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-on-surface mb-2">Centro Assistenza</h1>
+        <p class="text-on-surface-variant">Trova risposte alle tue domande</p>
+    </div>
+
+    <!-- FAQ Section -->
+    <mat-card class="surface-container mb-8">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Domande Frequenti</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-6">
+            <mat-accordion>
+                <mat-expansion-panel>
+                    <mat-expansion-panel-header>
+                        <mat-panel-title>Come creo una nuova fattura?</mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <p>Per creare una nuova fattura, clicca sul pulsante "Nuova Fattura" nella sezione Fatture.
+                        Compila tutti i campi richiesti e aggiungi le righe della fattura.</p>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                    <mat-expansion-panel-header>
+                        <mat-panel-title>Come posso esportare una fattura in PDF?</mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <p>Nella pagina di dettaglio della fattura, clicca sul pulsante "Scarica PDF" per generare
+                        e scaricare automaticamente il file PDF della fattura.</p>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                    <mat-expansion-panel-header>
+                        <mat-panel-title>Come gestisco i miei clienti?</mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <p>Vai alla sezione "Clienti" dal menu laterale. Qui puoi aggiungere, modificare ed eliminare
+                        i tuoi clienti. I clienti salvati saranno disponibili durante la creazione delle fatture.</p>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                    <mat-expansion-panel-header>
+                        <mat-panel-title>Posso modificare una fattura già inviata?</mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <p>Sì, puoi modificare qualsiasi fattura cliccando sul pulsante "Modifica" nella pagina di
+                        dettaglio. Tuttavia, ti consigliamo di fare attenzione quando modifichi fatture già inviate.</p>
+                </mat-expansion-panel>
+            </mat-accordion>
+        </mat-card-content>
+    </mat-card>
+
+    <!-- Contact Support -->
+    <mat-card class="surface-container">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Contatta il Supporto</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <mat-icon class="text-6xl text-primary mb-4">email</mat-icon>
+                    <h3 class="font-semibold text-on-surface mb-2">Email</h3>
+                    <p class="text-on-surface-variant">support&#64;invoiceapp.com</p>
+                </div>
+
+                <div class="text-center">
+                    <mat-icon class="text-6xl text-primary mb-4">phone</mat-icon>
+                    <h3 class="font-semibold text-on-surface mb-2">Telefono</h3>
+                    <p class="text-on-surface-variant">+39 02 1234567</p>
+                </div>
+
+                <div class="text-center">
+                    <mat-icon class="text-6xl text-primary mb-4">schedule</mat-icon>
+                    <h3 class="font-semibold text-on-surface mb-2">Orari</h3>
+                    <p class="text-on-surface-variant">Lun-Ven: 9:00-18:00</p>
+                </div>
+            </div>
+        </mat-card-content>
+    </mat-card>
+</div>

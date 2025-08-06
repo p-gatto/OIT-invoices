@@ -1,0 +1,11 @@
+.help-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .help-container {
+        padding: 1rem;
+    }
+}
