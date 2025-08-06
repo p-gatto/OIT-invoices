@@ -33,8 +33,10 @@
                 <button mat-raised-button color="primary" class="w-full h-12 text-lg"
                     [disabled]="loginForm.invalid || loading()" type="submit">
                     @if (loading()) {
-                    <mat-icon class="animate-spin">hourglass_empty</mat-icon>
-                    <span>Accesso in corso...</span>
+                    <ng-container>
+                        <mat-icon class="animate-spin">hourglass_empty</mat-icon>
+                        <span>Accesso in corso...</span>
+                    </ng-container>
                     } @else {
                     <span>Accedi</span>
                     }

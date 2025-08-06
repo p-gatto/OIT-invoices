@@ -73,9 +73,22 @@
     <mat-dialog-actions align="end" class="mt-4">
         <button mat-button type="button" (click)="onCancel()">Annulla</button>
         <button mat-raised-button color="primary" type="submit" [disabled]="customerForm.invalid || saving">
-            <mat-icon *ngIf="saving" class="animate-spin">hourglass_empty</mat-icon>
-            <mat-icon *ngIf="!saving">{{ data ? 'save' : 'add' }}</mat-icon>
-            {{ saving ? 'Salvataggio...' : (data ? 'Aggiorna' : 'Crea') }}
+            @if (saving) {
+            <ng-container>
+                <mat-icon class="animate-spin">hourglass_empty</mat-icon>
+                <span>Salvataggio...</span>
+            </ng-container>
+            } @else if (data) {
+            <ng-container>
+                <mat-icon>save</mat-icon>
+                <span>Aggiorna</span>
+            </ng-container>
+            } @else {
+            <ng-container>
+                <mat-icon>add</mat-icon>
+                <span>Crea</span>
+            </ng-container>
+            }
         </button>
     </mat-dialog-actions>
 </form>
