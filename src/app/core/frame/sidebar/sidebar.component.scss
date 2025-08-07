@@ -1,12 +1,20 @@
 .sidebar-content {
-    width: 256px;
+    width: 100%;
+    /* Riempie completamente il mat-sidenav */
+    height: 100%;
     background-color: var(--mat-sys-surface-container);
+    /* Rimuovo min-width e max-width per adattarsi al contenitore */
 }
 
 .menu-item {
     margin-bottom: 4px;
     border-radius: 12px;
     transition: all 0.2s ease;
+    padding: 8px 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    width: 100%;
 }
 
 .menu-item:hover {
@@ -25,29 +33,128 @@
 .menu-icon {
     color: var(--mat-sys-on-surface-variant);
     margin-right: 12px;
+    min-width: 24px;
+    flex-shrink: 0;
 }
 
 .menu-label {
     color: var(--mat-sys-on-surface);
     font-weight: 500;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1;
 }
 
 .badge {
     background-color: var(--mat-sys-error);
     color: var(--mat-sys-on-error);
-    font-size: 12px;
-    padding: 2px 8px;
+    font-size: 11px;
+    padding: 3px 8px;
     border-radius: 12px;
     min-width: 20px;
     text-align: center;
+    margin-left: auto;
+    font-weight: 600;
+    flex-shrink: 0;
 }
 
 mat-nav-list {
     padding: 0;
+    width: 100%;
 }
 
 mat-list-item {
-    height: 48px;
+    height: auto;
+    min-height: 48px;
+    padding: 0 !important;
+    width: 100%;
+}
+
+/* Override per i componenti Angular Material specifici */
+.mat-mdc-list-item {
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+.mat-mdc-list-item .mdc-list-item__content {
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+/* Sezione header della sidebar */
+.sidebar-content>div:first-child {
+    padding: 16px;
+}
+
+.sidebar-content>div:first-child h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.sidebar-content>div:first-child p {
+    font-size: 11px;
+    margin: 2px 0 0 0;
+    opacity: 0.8;
+}
+
+/* Logo/Icon container */
+.sidebar-content .w-10.h-10 {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+/* Navigation container */
+nav {
+    padding: 0 8px;
+}
+
+/* Sezione impostazioni */
+nav+mat-divider+div {
+    padding: 0 8px;
+}
+
+nav+mat-divider+div h3 {
+    padding: 8px 12px 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Footer della sidebar */
+.sidebar-content>div:last-child {
+    padding: 16px;
+    border-top: 1px solid var(--mat-sys-outline-variant);
+    margin-top: auto;
+}
+
+.sidebar-content>div:last-child div {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* Miglioramenti per l'accessibilità */
+.menu-item:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+}
+
+/* Hover states migliorati */
+.menu-item:hover .menu-icon {
+    color: var(--mat-sys-on-surface);
+    transform: translateX(2px);
+    transition: all 0.2s ease;
+}
+
+.menu-item:hover .badge {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
 }
 
 .text-primary {

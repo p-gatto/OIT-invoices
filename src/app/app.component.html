@@ -2,7 +2,8 @@
   <mat-sidenav-container class="flex-1 flex flex-col">
     <!-- Sidebar -->
     <mat-sidenav #drawer [mode]="isDesktop() ? 'side' : 'over'" [opened]="isDesktop() && sidebarOpen()"
-      class="w-64 bg-surface-container">
+      class="bg-surface-container">
+      <!-- Rimuovo la classe w-64 e lascio che i CSS gestiscano la larghezza -->
       <!-- Mostra la sidebar solo se l'utente è autenticato -->
       @if (authService.currentUser()) {
       <app-sidebar (menuItemClick)="toggleSidebar()"></app-sidebar>

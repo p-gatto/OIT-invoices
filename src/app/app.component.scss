@@ -8,10 +8,71 @@ mat-sidenav-container {
 
 mat-sidenav {
     border-right: 1px solid var(--mat-sys-outline-variant);
+
+    /* IMPORTANTE: Forza la larghezza del mat-sidenav per adattarsi al SidebarComponent */
+    width: 256px !important;
+    min-width: 256px !important;
+    max-width: 256px !important;
+
+    /* Rimuove eventuali padding/margin predefiniti */
+    padding: 0 !important;
+
+    /* Assicura che il contenuto riempia completamente il sidenav */
+    .mat-sidenav-content {
+        width: 100%;
+        height: 100%;
+    }
+}
+
+/* Override specifici per Material Design sidenav */
+.mat-sidenav {
+    width: 256px !important;
+    min-width: 256px !important;
+    max-width: 256px !important;
+}
+
+/* Se stai usando la classe w-64 di Tailwind (che corrisponde a 256px) */
+.w-64 {
+    width: 256px !important;
+}
+
+/* Aggiustamenti per il contenuto principale quando la sidebar è aperta */
+@media (min-width: 768px) {
+    .mat-sidenav-content {
+        transition: margin-left 0.3s ease;
+    }
+
+    /* Quando la sidebar è aperta, il contenuto si sposta */
+    mat-sidenav-container.mat-sidenav-opened .mat-sidenav-content {
+        margin-left: 0;
+    }
 }
 
 @media (max-width: 768px) {
     main {
         padding: 1rem;
     }
+
+    /* Su mobile, mantieni la stessa larghezza compatta */
+    mat-sidenav {
+        width: 256px !important;
+        min-width: 256px !important;
+        max-width: 256px !important;
+        box-shadow: 0 8px 10px -5px rgba(0, 0, 0, 0.2),
+            0 16px 24px 2px rgba(0, 0, 0, 0.14),
+            0 6px 30px 5px rgba(0, 0, 0, 0.12);
+    }
+}
+
+/* Overlay migliorato per mobile */
+.mat-sidenav-backdrop {
+    background-color: rgba(0, 0, 0, 0.6);
+    transition: background-color 0.3s ease;
+}
+
+/* Assicura che il SidebarComponent riempia completamente il mat-sidenav */
+app-sidebar {
+    display: block;
+    width: 100%;
+    height: 100%;
 }

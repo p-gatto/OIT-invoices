@@ -276,6 +276,51 @@ body {
   }
 }
 
+
+.app-container {
+  height: 100vh;
+}
+
+mat-sidenav-container {
+  background-color: var(--mat-sys-surface);
+}
+
+mat-sidenav {
+  border-right: 1px solid var(--mat-sys-outline-variant);
+  /* Rimuovo la specifica della larghezza da qui, ora è gestita nel component sidebar */
+}
+
+/* Aggiustamenti per il contenuto principale quando la sidebar è aperta */
+@media (min-width: 768px) {
+  .mat-sidenav-content {
+    transition: margin-left 0.3s ease;
+  }
+
+  /* Quando la sidebar è aperta, il contenuto si sposta leggermente */
+  mat-sidenav-container.mat-sidenav-opened .mat-sidenav-content {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  main {
+    padding: 1rem;
+  }
+
+  /* Su mobile, assicurati che la sidebar non interferisca */
+  mat-sidenav {
+    box-shadow: 0 8px 10px -5px rgba(0, 0, 0, 0.2),
+      0 16px 24px 2px rgba(0, 0, 0, 0.14),
+      0 6px 30px 5px rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* Overlay migliorato per mobile */
+.mat-sidenav-backdrop {
+  background-color: rgba(0, 0, 0, 0.6);
+  transition: background-color 0.3s ease;
+}
+
 html,
 body {
   height: 100%;
