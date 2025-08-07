@@ -34,13 +34,18 @@
                 <mat-icon>notifications</mat-icon>
             </button> -->
 
+            <!-- Home -->
+            <button mat-icon-button aria-label="Home" routerLink="/home">
+                <mat-icon>home</mat-icon>
+            </button>
+
             <!-- User Menu -->
             <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="User menu">
                 <mat-icon>account_circle</mat-icon>
             </button>
 
             <mat-menu #userMenu="matMenu" xPosition="before">
-                <button mat-menu-item>
+                <!-- <button mat-menu-item>
                     <mat-icon>person</mat-icon>
                     <span>Profilo</span>
                 </button>
@@ -48,7 +53,7 @@
                     <mat-icon>settings</mat-icon>
                     <span>Impostazioni</span>
                 </button>
-                <mat-divider></mat-divider>
+                <mat-divider></mat-divider> -->
                 <button mat-menu-item (click)="logout()">
                     <mat-icon>logout</mat-icon>
                     <span>Logout</span>
