@@ -55,7 +55,7 @@ export class CustomersComponent implements OnInit {
   router = inject(Router);
 
   customers = signal<Customer[]>([]);
-  searchQuery = '';
+  searchQuery = signal(''); // Convertito in signal per reattività
   loading = signal(true);
   displayedColumns = ['name', 'contact', 'tax_info', 'address', 'actions'];
 
@@ -63,15 +63,19 @@ export class CustomersComponent implements OnInit {
   customerStats = signal<Map<string, any>>(new Map());
 
   filteredCustomers = computed(() => {
-    if (!this.searchQuery) return this.customers();
+    const query = this.searchQuery().toLowerCase().trim();
 
-    const query = this.searchQuery.toLowerCase();
+    if (!query) {
+      return this.customers();
+    }
+
     return this.customers().filter(customer =>
       customer.name.toLowerCase().includes(query) ||
       customer.email?.toLowerCase().includes(query) ||
       customer.phone?.toLowerCase().includes(query) ||
       customer.tax_code?.toLowerCase().includes(query) ||
-      customer.vat_number?.toLowerCase().includes(query)
+      customer.vat_number?.toLowerCase().includes(query) ||
+      customer.address?.toLowerCase().includes(query)
     );
   });
 
@@ -110,8 +114,73 @@ export class CustomersComponent implements OnInit {
     });
   }
 
+  /**
+   * Applica i filtri di ricerca
+   * Con i signal, il computed filteredCustomers si aggiorna automaticamente
+   * quando cambia searchQuery
+   */
   applyFilter() {
-    // Triggers computed signal recalculation
+    // Con i signal, questo metodo può essere utilizzato per logiche aggiuntive
+    // come logging, analytics, o validazioni
+    const query = this.searchQuery().trim();
+
+    /* if (query.length > 0) {
+      console.log(`Filtering customers with query: "${query}"`);
+    } */
+
+    // Il computed filteredCustomers si aggiorna automaticamente
+    // grazie alla reattività dei signal
+  }
+
+  /**
+   * Pulisce il filtro di ricerca
+   */
+  clearFilter() {
+    this.searchQuery.set('');
+  }
+
+  /**
+   * Imposta un filtro di ricerca specifico
+   */
+  setFilter(query: string) {
+    this.searchQuery.set(query);
+  }
+
+  /**
+   * Cerca clienti per nome (utilità per ricerche rapide)
+   */
+  searchByName(name: string) {
+    this.setFilter(name);
+  }
+
+  /**
+   * Cerca clienti per email (utilità per ricerche rapide)
+   */
+  searchByEmail(email: string) {
+    this.setFilter(email);
+  }
+
+  /**
+   * Restituisce il numero di risultati filtrati
+   */
+  getFilteredCount(): number {
+    return this.filteredCustomers().length;
+  }
+
+  /**
+   * Verifica se sono attivi dei filtri
+   */
+  hasActiveFilters(): boolean {
+    return this.searchQuery().trim().length > 0;
+  }
+
+  /**
+   * METODO FONDAMENTALE: Ferma la propagazione del click event
+   * Questo impedisce che il click sul bottone menu attivi il click sulla riga
+   */
+  stopEventPropagation(event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
   }
 
   openCustomerDialog(customer?: Customer) {
