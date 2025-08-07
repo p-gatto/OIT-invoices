@@ -11,7 +11,7 @@
 
             <!-- Sidebar Toggle (Desktop) -->
             @if (authService.currentUser()) {
-            <button mat-icon-button class="hidden md:flex" (click)="toggleSidebar.emit()" aria-label="Toggle sidebar">
+            <button mat-icon-button class="hidden md:flex" (click)="toggleSidebarEvent()" aria-label="Toggle sidebar">
                 <mat-icon>{{ sidebarOpen() ? 'menu_open' : 'menu' }}</mat-icon>
             </button>
             }

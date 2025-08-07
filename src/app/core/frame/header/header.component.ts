@@ -50,4 +50,10 @@ export class HeaderComponent {
       }
     });
   }
+
+  toggleSidebarEvent() {
+    this.toggleSidebar.emit();
+    //this.menuClick.emit();
+  }
+
 }

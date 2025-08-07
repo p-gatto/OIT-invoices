@@ -1,4 +1,4 @@
-import { Component, effect, OnInit, signal } from '@angular/core';
+import { Component, effect, ElementRef, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 
@@ -27,7 +27,8 @@ import { AuthService } from './core/auth/auth.service';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
-export class AppComponent { //implements OnInit {
+export class AppComponent implements OnInit {
+
   title = 'OIT-invoices';
 
   sidebarOpen = signal(true);
