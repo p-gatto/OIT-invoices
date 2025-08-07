@@ -15,4 +15,5 @@ export interface Invoice {
     notes?: string;
     items: InvoiceItem[];
     created_at?: string;
+    updated_at?: string;
 }

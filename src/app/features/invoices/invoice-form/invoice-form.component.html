@@ -18,7 +18,7 @@
             <button mat-raised-button color="primary" (click)="saveInvoice()"
                 [disabled]="invoiceForm.invalid || saving()">
                 <mat-icon>{{ saving() ? 'hourglass_empty' : 'save' }}</mat-icon>
-                {{ saving() ? 'Salvataggio...' : 'Salva Fattura' }}
+                {{ saving() ? 'Salvataggio...' : (isEditMode() ? 'Aggiorna Fattura' : 'Salva Fattura') }}
             </button>
         </div>
     </div>
@@ -34,6 +34,7 @@
                     <mat-form-field appearance="outline">
                         <mat-label>Numero Fattura</mat-label>
                         <input matInput formControlName="invoice_number" readonly>
+                        <mat-hint>Generato automaticamente</mat-hint>
                     </mat-form-field>
 
                     <mat-form-field appearance="outline">
@@ -41,6 +42,9 @@
                         <input matInput [matDatepicker]="issuePicker" formControlName="issue_date">
                         <mat-datepicker-toggle matIconSuffix [for]="issuePicker"></mat-datepicker-toggle>
                         <mat-datepicker #issuePicker></mat-datepicker>
+                        <mat-error *ngIf="invoiceForm.get('issue_date')?.hasError('required')">
+                            La data di emissione è obbligatoria
+                        </mat-error>
                     </mat-form-field>
 
                     <mat-form-field appearance="outline">
@@ -48,6 +52,7 @@
                         <input matInput [matDatepicker]="duePicker" formControlName="due_date">
                         <mat-datepicker-toggle matIconSuffix [for]="duePicker"></mat-datepicker-toggle>
                         <mat-datepicker #duePicker></mat-datepicker>
+                        <mat-hint>Opzionale</mat-hint>
                     </mat-form-field>
                 </div>
 
@@ -55,27 +60,54 @@
                     <mat-form-field appearance="outline">
                         <mat-label>Cliente</mat-label>
                         <input matInput formControlName="customer_search" [matAutocomplete]="customerAuto"
-                            placeholder="Cerca o seleziona cliente">
+                            placeholder="Cerca o seleziona cliente" required>
+                        <mat-icon matSuffix>search</mat-icon>
                         <mat-autocomplete #customerAuto="matAutocomplete" [displayWith]="displayCustomer"
                             (optionSelected)="onCustomerSelected($event)">
                             @for (customer of (filteredCustomers | async); track customer.id) {
                             <mat-option [value]="customer">
-                                <div>
-                                    <div class="font-medium">{{ customer.name }}</div>
-                                    <div class="text-sm text-on-surface-variant">{{ customer.email }}</div>
+                                <div class="flex items-center gap-3">
+                                    <mat-icon class="text-primary">
+                                        {{ customer.vat_number ? 'business' : 'person' }}
+                                    </mat-icon>
+                                    <div class="flex-1">
+                                        <div class="font-medium">{{ customer.name }}</div>
+                                        @if (customer.email) {
+                                        <div class="text-sm text-on-surface-variant">{{ customer.email }}</div>
+                                        }
+                                        @if (customer.vat_number) {
+                                        <div class="text-xs text-on-surface-variant">P.IVA: {{ customer.vat_number }}
+                                        </div>
+                                        }
+                                    </div>
                                 </div>
                             </mat-option>
                             }
                         </mat-autocomplete>
+                        <mat-error *ngIf="invoiceForm.get('customer_search')?.hasError('required')">
+                            Seleziona un cliente
+                        </mat-error>
                     </mat-form-field>
 
                     <mat-form-field appearance="outline">
                         <mat-label>Stato</mat-label>
                         <mat-select formControlName="status">
-                            <mat-option value="draft">Bozza</mat-option>
-                            <mat-option value="sent">Inviata</mat-option>
-                            <mat-option value="paid">Pagata</mat-option>
-                            <mat-option value="overdue">Scaduta</mat-option>
+                            <mat-option value="draft">
+                                <mat-icon>edit</mat-icon>
+                                Bozza
+                            </mat-option>
+                            <mat-option value="sent">
+                                <mat-icon>send</mat-icon>
+                                Inviata
+                            </mat-option>
+                            <mat-option value="paid">
+                                <mat-icon>check_circle</mat-icon>
+                                Pagata
+                            </mat-option>
+                            <mat-option value="overdue">
+                                <mat-icon>warning</mat-icon>
+                                Scaduta
+                            </mat-option>
                         </mat-select>
                     </mat-form-field>
                 </div>
@@ -83,56 +115,150 @@
                 <mat-form-field appearance="outline" class="w-full mt-6">
                     <mat-label>Note</mat-label>
                     <textarea matInput formControlName="notes" rows="3"
-                        placeholder="Note aggiuntive sulla fattura"></textarea>
+                        placeholder="Note aggiuntive sulla fattura (opzionale)"></textarea>
+                    <mat-hint>Condizioni di pagamento, note particolari, ecc.</mat-hint>
                 </mat-form-field>
             </mat-card-content>
         </mat-card>
 
         <!-- Invoice Items -->
         <mat-card class="surface-container">
-            <mat-card-header>
+            <mat-card-header class="flex justify-between items-center">
                 <mat-card-title class="text-on-surface">Righe Fattura</mat-card-title>
-                <div class="flex-1"></div>
-                <button mat-icon-button color="primary" type="button" (click)="addItem()">
-                    <mat-icon>add</mat-icon>
-                </button>
+                <div class="flex gap-2">
+                    <!-- Quick Add Buttons -->
+                    <button mat-icon-button color="accent" type="button" (click)="addServiceHours()"
+                        matTooltip="Aggiungi ore di servizio">
+                        <mat-icon>schedule</mat-icon>
+                    </button>
+                    <button mat-icon-button color="accent" type="button" (click)="addConsultancy()"
+                        matTooltip="Aggiungi consulenza">
+                        <mat-icon>psychology</mat-icon>
+                    </button>
+                    <button mat-icon-button color="primary" type="button" (click)="addItem()"
+                        matTooltip="Aggiungi riga vuota">
+                        <mat-icon>add</mat-icon>
+                    </button>
+                </div>
             </mat-card-header>
             <mat-card-content class="p-6">
-                <div formArrayName="items" class="space-y-4">
+                <div formArrayName="items" class="space-y-6">
                     @for (item of itemsFormArray.controls; track $index; let i = $index) {
-                    <div [formGroupName]="i" class="border border-outline-variant rounded-lg p-4">
+                    <div [formGroupName]="i" class="border border-outline-variant rounded-lg p-6 relative">
+                        <!-- Item Header -->
                         <div class="flex justify-between items-start mb-4">
-                            <h4 class="text-lg font-medium text-on-surface">Riga {{ i + 1 }}</h4>
-                            @if (itemsFormArray.length > 1) {
-                            <button mat-icon-button color="warn" type="button" (click)="removeItem(i)">
-                                <mat-icon>delete</mat-icon>
-                            </button>
-                            }
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span class="text-primary font-bold text-sm">{{ i + 1 }}</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-on-surface">Riga {{ i + 1 }}</h4>
+                            </div>
+                            <div class="flex gap-2">
+                                @if (itemsFormArray.length > 1) {
+                                <button mat-icon-button color="warn" type="button" (click)="duplicateItem(i)"
+                                    matTooltip="Duplica riga">
+                                    <mat-icon>content_copy</mat-icon>
+                                </button>
+                                <button mat-icon-button color="warn" type="button" (click)="removeItem(i)"
+                                    matTooltip="Elimina riga">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+                                }
+                            </div>
                         </div>
 
+                        <!-- Product Search -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Cerca Prodotto/Servizio</mat-label>
+                                <input matInput formControlName="product_search" [matAutocomplete]="productAuto"
+                                    placeholder="Digita per cercare nei prodotti">
+                                <mat-icon matSuffix>search</mat-icon>
+                                <mat-autocomplete #productAuto="matAutocomplete" [displayWith]="displayProduct"
+                                    (optionSelected)="onProductSelected($event, i)">
+                                    @if (filteredProducts[i]) {
+                                    @for (product of (filteredProducts[i] | async); track product.id) {
+                                    <mat-option [value]="product">
+                                        <div class="flex items-center gap-3">
+                                            <mat-icon class="text-primary">inventory_2</mat-icon>
+                                            <div class="flex-1">
+                                                <div class="font-medium">{{ product.name }}</div>
+                                                @if (product.description) {
+                                                <div class="text-sm text-on-surface-variant line-clamp-1">{{
+                                                    product.description }}</div>
+                                                }
+                                                <div class="text-xs text-on-surface-variant flex items-center gap-2">
+                                                    <span>€{{ product.unit_price | number:'1.2-2' }}</span>
+                                                    <span>•</span>
+                                                    <span>IVA {{ product.tax_rate }}%</span>
+                                                    @if (product.category) {
+                                                    <span>•</span>
+                                                    <mat-chip class="text-xs">{{ product.category }}</mat-chip>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </mat-option>
+                                    }
+                                    }
+                                </mat-autocomplete>
+                                <mat-hint>Seleziona da archivio o compila manualmente</mat-hint>
+                            </mat-form-field>
+
+                            <!-- Quick Product Info Display -->
+                            <div class="flex items-end">
+                                @if (item.get('product_id')?.value) {
+                                <mat-chip-set>
+                                    <mat-chip class="bg-primary/10 text-primary">
+                                        <mat-icon matChipAvatar>check_circle</mat-icon>
+                                        Prodotto selezionato
+                                    </mat-chip>
+                                </mat-chip-set>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Item Details -->
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <!-- Description -->
                             <mat-form-field appearance="outline" class="md:col-span-5">
                                 <mat-label>Descrizione</mat-label>
-                                <input matInput formControlName="description"
-                                    placeholder="Descrizione del prodotto/servizio">
+                                <textarea matInput formControlName="description" rows="2"
+                                    placeholder="Descrizione del prodotto/servizio" required></textarea>
+                                <mat-error *ngIf="item.get('description')?.hasError('required')">
+                                    La descrizione è obbligatoria
+                                </mat-error>
                             </mat-form-field>
 
+                            <!-- Quantity -->
                             <mat-form-field appearance="outline" class="md:col-span-2">
                                 <mat-label>Quantità</mat-label>
-                                <input matInput type="number" formControlName="quantity" (input)="calculateItemTotal(i)"
-                                    min="0" step="0.01">
+                                <input matInput type="number" formControlName="quantity" min="0" step="0.01" required>
+                                <mat-error *ngIf="item.get('quantity')?.hasError('required')">
+                                    Obbligatorio
+                                </mat-error>
+                                <mat-error *ngIf="item.get('quantity')?.hasError('min')">
+                                    Deve essere > 0
+                                </mat-error>
                             </mat-form-field>
 
+                            <!-- Unit Price -->
                             <mat-form-field appearance="outline" class="md:col-span-2">
                                 <mat-label>Prezzo Unit.</mat-label>
-                                <input matInput type="number" formControlName="unit_price"
-                                    (input)="calculateItemTotal(i)" min="0" step="0.01">
+                                <input matInput type="number" formControlName="unit_price" min="0" step="0.01" required>
                                 <span matTextPrefix>€</span>
+                                <mat-error *ngIf="item.get('unit_price')?.hasError('required')">
+                                    Obbligatorio
+                                </mat-error>
+                                <mat-error *ngIf="item.get('unit_price')?.hasError('min')">
+                                    Deve essere ≥ 0
+                                </mat-error>
                             </mat-form-field>
 
+                            <!-- Tax Rate -->
                             <mat-form-field appearance="outline" class="md:col-span-1">
                                 <mat-label>IVA %</mat-label>
-                                <mat-select formControlName="tax_rate" (selectionChange)="calculateItemTotal(i)">
+                                <mat-select formControlName="tax_rate">
                                     <mat-option [value]="0">0%</mat-option>
                                     <mat-option [value]="4">4%</mat-option>
                                     <mat-option [value]="10">10%</mat-option>
@@ -140,10 +266,26 @@
                                 </mat-select>
                             </mat-form-field>
 
-                            <mat-form-field appearance="outline" class="md:col-span-2">
+                            <!-- Unit -->
+                            <mat-form-field appearance="outline" class="md:col-span-1">
+                                <mat-label>U.M.</mat-label>
+                                <mat-select formControlName="unit">
+                                    <mat-option value="pz">Pz</mat-option>
+                                    <mat-option value="ore">Ore</mat-option>
+                                    <mat-option value="giorni">Gg</mat-option>
+                                    <mat-option value="mesi">Mesi</mat-option>
+                                    <mat-option value="kg">Kg</mat-option>
+                                    <mat-option value="m">Mt</mat-option>
+                                    <mat-option value="mq">Mq</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+
+                            <!-- Total (Read-only) -->
+                            <mat-form-field appearance="outline" class="md:col-span-1">
                                 <mat-label>Totale</mat-label>
-                                <input matInput formControlName="total" readonly>
+                                <input matInput formControlName="total" readonly class="font-bold">
                                 <span matTextPrefix>€</span>
+                                <mat-hint>IVA inclusa</mat-hint>
                             </mat-form-field>
                         </div>
                     </div>
@@ -151,13 +293,44 @@
                 </div>
 
                 @if (itemsFormArray.length === 0) {
-                <div class="text-center py-8">
+                <div class="text-center py-12 border-2 border-dashed border-outline-variant rounded-lg">
                     <mat-icon class="text-6xl text-on-surface-variant mb-4">inventory_2</mat-icon>
-                    <p class="text-on-surface-variant mb-4">Nessuna riga aggiunta</p>
-                    <button mat-raised-button color="primary" type="button" (click)="addItem()">
-                        <mat-icon>add</mat-icon>
-                        Aggiungi Prima Riga
-                    </button>
+                    <p class="text-on-surface-variant mb-6">Nessuna riga aggiunta alla fattura</p>
+                    <div class="flex justify-center gap-2">
+                        <button mat-raised-button color="primary" type="button" (click)="addItem()">
+                            <mat-icon>add</mat-icon>
+                            Aggiungi Prima Riga
+                        </button>
+                        <button mat-outlined-button type="button" (click)="addServiceHours()">
+                            <mat-icon>schedule</mat-icon>
+                            Ore di Servizio
+                        </button>
+                        <button mat-outlined-button type="button" (click)="addConsultancy()">
+                            <mat-icon>psychology</mat-icon>
+                            Consulenza
+                        </button>
+                    </div>
+                </div>
+                }
+
+                <!-- Quick Actions for Items -->
+                @if (itemsFormArray.length > 0) {
+                <div class="flex justify-center mt-6">
+                    <div class="flex gap-2 p-3 bg-surface-container-high rounded-lg">
+                        <span class="text-sm text-on-surface-variant self-center mr-2">Aggiungi rapido:</span>
+                        <button mat-outlined-button type="button" (click)="addItem()" size="small">
+                            <mat-icon>add</mat-icon>
+                            Riga Vuota
+                        </button>
+                        <button mat-outlined-button type="button" (click)="addServiceHours()" size="small">
+                            <mat-icon>schedule</mat-icon>
+                            Ore Servizio
+                        </button>
+                        <button mat-outlined-button type="button" (click)="addConsultancy()" size="small">
+                            <mat-icon>psychology</mat-icon>
+                            Consulenza
+                        </button>
+                    </div>
                 </div>
                 }
             </mat-card-content>
@@ -167,26 +340,91 @@
         <mat-card class="surface-container">
             <mat-card-content class="p-6">
                 <div class="flex justify-end">
-                    <div class="w-full md:w-96 space-y-4">
-                        <div class="flex justify-between items-center">
+                    <div class="w-full md:w-96">
+                        <!-- Subtotal -->
+                        <div class="flex justify-between items-center py-2">
                             <span class="text-on-surface-variant">Subtotale:</span>
-                            <span class="font-medium">€{{ subtotal() | number:'1.2-2' }}</span>
+                            <span class="font-medium text-lg">€{{ subtotal() | number:'1.2-2' }}</span>
                         </div>
 
-                        <div class="flex justify-between items-center">
-                            <span class="text-on-surface-variant">IVA:</span>
-                            <span class="font-medium">€{{ taxAmount() | number:'1.2-2' }}</span>
+                        <!-- Tax Amount -->
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-on-surface-variant">IVA totale:</span>
+                            <span class="font-medium text-lg">€{{ taxAmount() | number:'1.2-2' }}</span>
                         </div>
 
-                        <mat-divider></mat-divider>
+                        <mat-divider class="my-3"></mat-divider>
 
-                        <div class="flex justify-between items-center text-lg">
-                            <span class="font-semibold text-on-surface">Totale:</span>
-                            <span class="font-bold text-primary">€{{ total() | number:'1.2-2' }}</span>
+                        <!-- Total -->
+                        <div class="flex justify-between items-center py-3 bg-primary/5 px-4 rounded-lg">
+                            <span class="font-bold text-xl text-on-surface">TOTALE FATTURA:</span>
+                            <span class="font-bold text-2xl text-primary">€{{ total() | number:'1.2-2' }}</span>
+                        </div>
+
+                        <!-- Items Summary -->
+                        <div class="mt-4 text-center">
+                            <mat-chip-set>
+                                <mat-chip class="bg-secondary/10 text-secondary">
+                                    <mat-icon matChipAvatar>receipt</mat-icon>
+                                    {{ itemsFormArray.length }} {{ itemsFormArray.length === 1 ? 'riga' : 'righe' }}
+                                </mat-chip>
+                                @if (total() > 0) {
+                                <mat-chip class="bg-green-100 text-green-800">
+                                    <mat-icon matChipAvatar>check_circle</mat-icon>
+                                    Pronta per il salvataggio
+                                </mat-chip>
+                                }
+                            </mat-chip-set>
                         </div>
                     </div>
                 </div>
             </mat-card-content>
         </mat-card>
+
+        <!-- Action Buttons (Mobile Friendly) -->
+        <div class="sticky bottom-4 z-10">
+            <mat-card class="surface-container shadow-lg">
+                <mat-card-content class="p-4">
+                    <div class="flex flex-col sm:flex-row gap-3 justify-end">
+                        <button mat-outlined-button (click)="goBack()" type="button" class="order-2 sm:order-1">
+                            <mat-icon>arrow_back</mat-icon>
+                            Annulla
+                        </button>
+
+                        <button mat-raised-button color="primary" (click)="saveInvoice()"
+                            [disabled]="invoiceForm.invalid || saving() || itemsFormArray.length === 0"
+                            class="order-1 sm:order-2">
+                            @if (saving()) {
+                            <ng-content><mat-icon class="animate-spin">hourglass_empty</mat-icon></ng-content>
+                            {{ isEditMode() ? 'Aggiornamento...' : 'Salvataggio...' }}
+                            } @else {
+                            <ng-content><mat-icon>{{ isEditMode() ? 'update' : 'save' }}</mat-icon></ng-content>
+                            {{ isEditMode() ? 'Aggiorna Fattura' : 'Salva Fattura' }}
+                            }
+                        </button>
+                    </div>
+
+                    <!-- Validation Messages -->
+                    @if (invoiceForm.invalid || itemsFormArray.length === 0) {
+                    <div class="mt-3 p-3 bg-orange-50 border-l-4 border-orange-400 rounded">
+                        <div class="flex items-center">
+                            <mat-icon class="text-orange-600 mr-2">warning</mat-icon>
+                            <div class="text-sm">
+                                @if (!invoiceForm.get('customer_search')?.valid) {
+                                <p class="text-orange-700">• Seleziona un cliente</p>
+                                }
+                                @if (itemsFormArray.length === 0) {
+                                <p class="text-orange-700">• Aggiungi almeno una riga alla fattura</p>
+                                }
+                                @if (itemsFormArray.length > 0 && invoiceForm.get('items')?.invalid) {
+                                <p class="text-orange-700">• Completa tutti i campi obbligatori delle righe</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </mat-card-content>
+            </mat-card>
+        </div>
     </form>
 </div>

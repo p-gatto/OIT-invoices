@@ -1,15 +1,516 @@
 .invoice-form-container {
     padding: 2rem;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
+    position: relative;
 }
 
+// Form Field Styling
 .mat-mdc-form-field {
     width: 100%;
+
+    &.readonly {
+        .mat-mdc-input-element {
+            background-color: var(--mat-sys-surface-container);
+            cursor: not-allowed;
+        }
+    }
 }
 
+// Invoice Items Styling
+.invoice-items-container {
+    .item-row {
+        border: 2px solid var(--mat-sys-outline-variant);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        position: relative;
+        transition: all 0.3s ease;
+
+        &:hover {
+            border-color: var(--mat-sys-primary);
+            box-shadow: var(--mat-sys-elevation-2);
+            transform: translateY(-2px);
+        }
+
+        &.has-product {
+            border-color: var(--mat-sys-primary);
+            background-color: var(--mat-sys-primary-container);
+
+            .item-indicator {
+                background-color: var(--mat-sys-primary);
+                color: var(--mat-sys-on-primary);
+            }
+        }
+
+        .item-indicator {
+            position: absolute;
+            top: -8px;
+            left: 16px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--mat-sys-surface-container-high);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.875rem;
+            border: 2px solid var(--mat-sys-surface);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+
+            h4 {
+                margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .item-actions {
+                display: flex;
+                gap: 0.5rem;
+                opacity: 0.7;
+                transition: opacity 0.2s ease;
+
+                &:hover {
+                    opacity: 1;
+                }
+            }
+        }
+
+        .product-search-section {
+            background-color: var(--mat-sys-surface-container);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+
+            .product-selected-indicator {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem;
+                background-color: var(--mat-sys-primary-container);
+                color: var(--mat-sys-on-primary-container);
+                border-radius: 8px;
+                font-size: 0.875rem;
+
+                mat-icon {
+                    font-size: 1.25rem;
+                }
+            }
+        }
+
+        .item-details-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1rem;
+
+            @media (max-width: 768px) {
+                grid-template-columns: 1fr;
+
+                .md\:col-span-1,
+                .md\:col-span-2,
+                .md\:col-span-5 {
+                    grid-column: span 1;
+                }
+            }
+        }
+    }
+
+    .add-item-section {
+        text-align: center;
+        padding: 2rem;
+        border: 2px dashed var(--mat-sys-outline-variant);
+        border-radius: 16px;
+        background-color: var(--mat-sys-surface-container);
+
+        &:hover {
+            border-color: var(--mat-sys-primary);
+            background-color: var(--mat-sys-primary-container);
+        }
+
+        .empty-state-icon {
+            opacity: 0.6;
+            margin-bottom: 1rem;
+        }
+
+        .quick-add-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+
+            button {
+                min-width: auto;
+                padding: 0.5rem 1rem;
+            }
+        }
+    }
+
+    .items-quick-actions {
+        background-color: var(--mat-sys-surface-container-high);
+        padding: 1rem;
+        border-radius: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+
+        .quick-action-label {
+            font-size: 0.875rem;
+            color: var(--mat-sys-on-surface-variant);
+            margin-right: 0.5rem;
+        }
+
+        button {
+            font-size: 0.75rem;
+            height: 32px;
+        }
+    }
+}
+
+// Totals Section
+.invoice-totals {
+    .totals-container {
+        background-color: var(--mat-sys-surface-container);
+        padding: 1.5rem;
+        border-radius: 16px;
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+
+            &.subtotal,
+            &.tax {
+                font-size: 1rem;
+                border-bottom: 1px solid var(--mat-sys-outline-variant);
+            }
+
+            &.final-total {
+                background-color: var(--mat-sys-primary-container);
+                color: var(--mat-sys-on-primary-container);
+                padding: 1rem;
+                border-radius: 8px;
+                margin-top: 1rem;
+                font-weight: bold;
+                font-size: 1.25rem;
+            }
+        }
+
+        .items-summary {
+            margin-top: 1rem;
+            text-align: center;
+
+            .summary-chips {
+                display: flex;
+                justify-content: center;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+            }
+        }
+    }
+}
+
+// Sticky Action Bar
+.sticky-actions {
+    position: sticky;
+    bottom: 1rem;
+    z-index: 10;
+    margin-top: 2rem;
+
+    mat-card {
+        box-shadow: var(--mat-sys-elevation-3);
+        border-radius: 16px;
+
+        .action-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+
+            @media (max-width: 640px) {
+                flex-direction: column-reverse;
+
+                button {
+                    width: 100%;
+                }
+            }
+        }
+
+        .validation-messages {
+            background-color: rgb(255 247 237); // orange-50 equivalent
+            border-left: 4px solid rgb(251 146 60); // orange-400 equivalent
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+
+            .validation-icon {
+                color: rgb(234 88 12); // orange-600
+            }
+
+            .validation-text {
+                font-size: 0.875rem;
+                color: rgb(194 65 12); // orange-700
+
+                p {
+                    margin: 0.25rem 0;
+                }
+            }
+        }
+    }
+}
+
+// Product Autocomplete Styling
+.mat-mdc-autocomplete-panel {
+    .mat-mdc-option {
+        .product-option {
+            padding: 0.75rem;
+
+            .product-info {
+                .product-name {
+                    font-weight: 500;
+                    margin-bottom: 0.25rem;
+                }
+
+                .product-description {
+                    font-size: 0.875rem;
+                    color: var(--mat-sys-on-surface-variant);
+                    margin-bottom: 0.25rem;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 1;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+
+                .product-details {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-size: 0.75rem;
+                    color: var(--mat-sys-on-surface-variant);
+
+                    .product-price {
+                        font-weight: 600;
+                        color: var(--mat-sys-primary);
+                    }
+
+                    .product-category {
+                        background-color: var(--mat-sys-secondary-container);
+                        color: var(--mat-sys-on-secondary-container);
+                        padding: 0.125rem 0.5rem;
+                        border-radius: 12px;
+                        font-size: 0.625rem;
+                    }
+                }
+            }
+        }
+
+        &.mat-mdc-option-active {
+            background-color: var(--mat-sys-primary-container);
+
+            .product-option .product-info .product-name {
+                color: var(--mat-sys-on-primary-container);
+            }
+        }
+    }
+}
+
+// Customer Autocomplete Styling  
+.customer-option {
+    .customer-info {
+        .customer-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .customer-email {
+            font-size: 0.875rem;
+            color: var(--mat-sys-on-surface-variant);
+        }
+
+        .customer-vat {
+            font-size: 0.75rem;
+            color: var(--mat-sys-on-surface-variant);
+        }
+    }
+}
+
+// Animations
+@keyframes slideInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-slide-up {
+    animation: slideInUp 0.3s ease-out;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+}
+
+// Loading States
+.saving-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 16px;
+
+    .saving-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+
+        .saving-text {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--mat-sys-on-surface);
+        }
+    }
+}
+
+// Responsive Design
 @media (max-width: 768px) {
     .invoice-form-container {
         padding: 1rem;
+    }
+
+    .invoice-items-container .item-row {
+        padding: 1rem;
+
+        .item-details-grid {
+            gap: 0.75rem;
+        }
+    }
+
+    .invoice-totals .totals-container {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .invoice-form-container {
+        padding: 0.5rem;
+    }
+
+    .invoice-items-container {
+        .add-item-section .quick-add-buttons {
+            flex-direction: column;
+            align-items: center;
+
+            button {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+
+        .items-quick-actions {
+            flex-direction: column;
+            gap: 0.5rem;
+
+            .quick-action-label {
+                margin: 0;
+            }
+
+            button {
+                width: 100%;
+                max-width: 150px;
+            }
+        }
+    }
+}
+
+// Print Styles
+@media print {
+    .invoice-form-container {
+        padding: 0;
+    }
+
+    .sticky-actions,
+    .item-actions,
+    .quick-add-buttons,
+    .items-quick-actions {
+        display: none !important;
+    }
+
+    .invoice-items-container .item-row {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+
+// Focus States
+.mat-mdc-form-field:focus-within {
+    .mat-mdc-text-field-wrapper {
+        box-shadow: 0 0 0 2px var(--mat-sys-primary);
+        border-radius: 4px;
+    }
+}
+
+// Error States
+.mat-mdc-form-field.mat-form-field-invalid {
+    .mat-mdc-text-field-wrapper {
+        border-color: var(--mat-sys-error);
+    }
+}
+
+// Success States
+.item-row.valid {
+    border-color: var(--mat-sys-tertiary);
+
+    .item-indicator {
+        background-color: var(--mat-sys-tertiary);
+        color: var(--mat-sys-on-tertiary);
+    }
+}
+
+// Dark Mode Adjustments
+@media (prefers-color-scheme: dark) {
+    .validation-messages {
+        background-color: rgb(67 56 51); // Dark orange background
+        border-left-color: rgb(251 146 60);
+
+        .validation-text {
+            color: rgb(254 215 170); // Light orange text
+        }
+    }
+
+    .saving-overlay {
+        background-color: rgba(0, 0, 0, 0.8);
     }
 }
