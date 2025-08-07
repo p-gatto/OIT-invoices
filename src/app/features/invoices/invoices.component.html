@@ -4,7 +4,12 @@
         <div>
             <h1 class="text-3xl font-bold text-on-surface mb-2">Fatture</h1>
             <p class="text-on-surface-variant">
-                {{ customerIdFilter ? 'Fatture filtrate per cliente' : 'Gestisci tutte le tue fatture' }}
+                {{ customerIdFilter() ? 'Fatture filtrate per cliente' : 'Gestisci tutte le tue fatture' }}
+                @if (hasActiveFilters()) {
+                <span class="ml-2 text-primary font-medium">
+                    ({{ getFilteredCount() }} di {{ invoices().length }} risultati)
+                </span>
+                }
             </p>
         </div>
         <button mat-raised-button color="primary" routerLink="/invoices/new" class="flex items-center gap-2">
@@ -14,7 +19,7 @@
     </div>
 
     <!-- Customer Filter Alert -->
-    @if (customerIdFilter) {
+    @if (customerIdFilter()) {
     <mat-card class="mb-4 surface-container bg-primary/10">
         <mat-card-content class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -31,31 +36,91 @@
     </mat-card>
     }
 
-    <!-- Filters -->
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <mat-card class="surface-container">
+            <mat-card-content class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold text-on-surface">{{ invoiceStats().count }}</p>
+                        <p class="text-sm text-on-surface-variant">Fatture trovate</p>
+                    </div>
+                    <mat-icon class="text-3xl text-primary">receipt_long</mat-icon>
+                </div>
+            </mat-card-content>
+        </mat-card>
+
+        <mat-card class="surface-container">
+            <mat-card-content class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold text-on-surface">€{{ invoiceStats().total | number:'1.2-2' }}</p>
+                        <p class="text-sm text-on-surface-variant">Valore totale</p>
+                    </div>
+                    <mat-icon class="text-3xl text-primary">euro</mat-icon>
+                </div>
+            </mat-card-content>
+        </mat-card>
+
+        <mat-card class="surface-container">
+            <mat-card-content class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold text-orange-600">{{ invoiceStats().pending }}</p>
+                        <p class="text-sm text-on-surface-variant">In attesa</p>
+                    </div>
+                    <mat-icon class="text-3xl text-orange-600">schedule</mat-icon>
+                </div>
+            </mat-card-content>
+        </mat-card>
+
+        <mat-card class="surface-container">
+            <mat-card-content class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold text-error">{{ invoiceStats().overdue }}</p>
+                        <p class="text-sm text-on-surface-variant">Scadute</p>
+                    </div>
+                    <mat-icon class="text-3xl text-error">warning</mat-icon>
+                </div>
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Search and Filters -->
     <mat-card class="mb-6 surface-container">
         <mat-card-content class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <mat-form-field appearance="outline">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <!-- Search -->
+                <mat-form-field appearance="outline" class="md:col-span-2">
                     <mat-label>Cerca fattura</mat-label>
-                    <input matInput [(ngModel)]="searchQuery" (input)="applyFilters()"
-                        placeholder="Numero fattura o cliente">
+                    <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); applyFilters()"
+                        placeholder="Numero fattura, cliente o note">
                     <mat-icon matSuffix>search</mat-icon>
+                    @if (searchQuery()) {
+                    <button matSuffix mat-icon-button (click)="searchQuery.set('')" matTooltip="Pulisci ricerca">
+                        <mat-icon>clear</mat-icon>
+                    </button>
+                    }
                 </mat-form-field>
 
+                <!-- Status Filter -->
                 <mat-form-field appearance="outline">
                     <mat-label>Stato</mat-label>
-                    <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
+                    <mat-select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); applyFilters()">
                         <mat-option value="">Tutti</mat-option>
-                        <mat-option value="draft">Bozza</mat-option>
-                        <mat-option value="sent">Inviata</mat-option>
-                        <mat-option value="paid">Pagata</mat-option>
-                        <mat-option value="overdue">Scaduta</mat-option>
+                        @for (status of availableStatuses(); track status.value) {
+                        <mat-option [value]="status.value">
+                            {{ status.label }} ({{ status.count }})
+                        </mat-option>
+                        }
                     </mat-select>
                 </mat-form-field>
 
+                <!-- Year Filter -->
                 <mat-form-field appearance="outline">
                     <mat-label>Anno</mat-label>
-                    <mat-select [(ngModel)]="yearFilter" (selectionChange)="applyFilters()">
+                    <mat-select [ngModel]="yearFilter()" (ngModelChange)="yearFilter.set($event); applyFilters()">
                         <mat-option value="">Tutti</mat-option>
                         @for (year of availableYears(); track year) {
                         <mat-option [value]="year">{{ year }}</mat-option>
@@ -63,19 +128,68 @@
                     </mat-select>
                 </mat-form-field>
 
+                <!-- Clear Filters Button -->
                 <div class="flex mt-2">
-                    <button mat-button (click)="clearFilters()" class="w-full">
+                    <button mat-button (click)="clearFilters()" class="w-full h-12" [disabled]="!hasActiveFilters()">
+                        <mat-icon>clear</mat-icon>
                         Pulisci filtri
                     </button>
                 </div>
             </div>
+
+            <!-- Quick Status Filters -->
+            <div class="flex items-center gap-2 mt-4 flex-wrap">
+                <span class="text-sm text-on-surface-variant mr-2">Filtri rapidi:</span>
+                @for (status of availableStatuses().slice(0, 4); track status.value) {
+                <button mat-button (click)="setStatusFilter(status.value)"
+                    [color]="statusFilter() === status.value ? 'primary' : ''" class="text-xs">
+                    {{ status.label }}
+                    @if (status.count > 0) {
+                    <span class="ml-1">({{ status.count }})</span>
+                    }
+                </button>
+                }
+            </div>
+
+            <!-- Active Filters Display -->
+            @if (hasActiveFilters()) {
+            <div class="flex items-center gap-2 mt-4 flex-wrap">
+                <span class="text-sm text-on-surface-variant">Filtri attivi:</span>
+                @if (searchQuery()) {
+                <mat-chip (removed)="searchQuery.set('')">
+                    Ricerca: "{{ searchQuery() }}"
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                @if (statusFilter()) {
+                <mat-chip (removed)="statusFilter.set('')">
+                    Stato: {{ getStatusLabel(statusFilter()) }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                @if (yearFilter()) {
+                <mat-chip (removed)="yearFilter.set('')">
+                    Anno: {{ yearFilter() }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                <button mat-button (click)="clearFilters()" class="text-primary ml-2">
+                    <mat-icon>clear_all</mat-icon>
+                    Pulisci tutto
+                </button>
+            </div>
+            }
         </mat-card-content>
     </mat-card>
 
     <!-- Invoices Table -->
     <mat-card class="surface-container">
         <mat-card-content class="p-0">
-            @if (filteredInvoices().length > 0) {
+            @if (loading()) {
+            <div class="flex justify-center items-center py-16">
+                <mat-spinner diameter="40"></mat-spinner>
+            </div>
+            } @else if (filteredInvoices().length > 0) {
             <div class="overflow-x-auto">
                 <table mat-table [dataSource]="filteredInvoices()" class="w-full">
                     <!-- Invoice Number Column -->
@@ -83,7 +197,9 @@
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Numero</th>
                         <td mat-cell *matCellDef="let invoice">
                             <div class="flex items-center gap-2">
-                                <mat-icon class="text-primary">receipt</mat-icon>
+                                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <mat-icon class="text-primary">receipt</mat-icon>
+                                </div>
                                 <span class="font-medium">{{ invoice.invoice_number }}</span>
                             </div>
                         </td>
@@ -93,23 +209,30 @@
                     <ng-container matColumnDef="customer">
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Cliente</th>
                         <td mat-cell *matCellDef="let invoice">
-                            <div>
-                                <p class="font-medium">{{ invoice.customer?.name }}</p>
+                            <div class="cursor-pointer"
+                                (click)="router.navigate(['/customers'], {queryParams: {customerId: invoice.customer_id}}); stopEventPropagation($event)"
+                                matTooltip="Vedi tutte le fatture di questo cliente">
+                                <p class="font-medium text-primary hover:underline">{{ invoice.customer?.name }}</p>
+                                @if (invoice.customer?.email) {
                                 <p class="text-sm text-on-surface-variant">{{ invoice.customer?.email }}</p>
+                                }
                             </div>
                         </td>
                     </ng-container>
 
                     <!-- Date Column -->
                     <ng-container matColumnDef="date">
-                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Data</th>
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Date</th>
                         <td mat-cell *matCellDef="let invoice">
                             <div>
-                                <p>{{ invoice.issue_date | date:'dd/MM/yyyy' }}</p>
+                                <p class="font-medium">{{ invoice.issue_date | date:'dd/MM/yyyy' }}</p>
                                 @if (invoice.due_date) {
-                                <p class="text-sm text-on-surface-variant">
-                                    Scad: {{ invoice.due_date | date:'dd/MM/yyyy' }}
-                                </p>
+                                <div class="text-sm flex items-center gap-1">
+                                    <span class="text-on-surface-variant">Scad:</span>
+                                    <span [class]="getDaysToDeadlineClass(invoice)">
+                                        {{ invoice.due_date | date:'dd/MM/yyyy' }}
+                                    </span>
+                                </div>
                                 }
                             </div>
                         </td>
@@ -120,7 +243,7 @@
                         <th mat-header-cell *matHeaderCellDef class="font-semibold text-right">Importo</th>
                         <td mat-cell *matCellDef="let invoice">
                             <div class="text-right">
-                                <p class="font-bold">€{{ invoice.total | number:'1.2-2' }}</p>
+                                <p class="font-bold text-lg">€{{ invoice.total | number:'1.2-2' }}</p>
                                 <p class="text-sm text-on-surface-variant">
                                     IVA: €{{ invoice.tax_amount | number:'1.2-2' }}
                                 </p>
@@ -132,7 +255,9 @@
                     <ng-container matColumnDef="status">
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Stato</th>
                         <td mat-cell *matCellDef="let invoice">
-                            <mat-chip [class]="getStatusClass(invoice.status)">
+                            <mat-chip [class]="getStatusClass(invoice.status)"
+                                (click)="setStatusFilter(invoice.status); stopEventPropagation($event)"
+                                class="cursor-pointer" matTooltip="Filtra per questo stato">
                                 {{ getStatusLabel(invoice.status) }}
                             </mat-chip>
                         </td>
@@ -140,10 +265,10 @@
 
                     <!-- Actions Column -->
                     <ng-container matColumnDef="actions">
-                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Azioni</th>
-                        <td mat-cell *matCellDef="let invoice">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold text-right">Azioni</th>
+                        <td mat-cell *matCellDef="let invoice" class="text-right">
                             <button mat-icon-button [matMenuTriggerFor]="actionsMenu"
-                                [matMenuTriggerData]="{invoice: invoice}">
+                                [matMenuTriggerData]="{invoice: invoice}" (click)="stopEventPropagation($event)">
                                 <mat-icon>more_vert</mat-icon>
                             </button>
                         </td>
@@ -151,22 +276,32 @@
 
                     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
                     <tr mat-row *matRowDef="let invoice; columns: displayedColumns;"
-                        class="hover:bg-surface-container-high cursor-pointer" (click)="viewInvoice(invoice.id!)"></tr>
+                        class="hover:bg-surface-container-high cursor-pointer" (click)="viewInvoice(invoice.id!)">
+                    </tr>
                 </table>
             </div>
             } @else {
             <div class="text-center py-16">
                 <mat-icon class="text-8xl text-on-surface-variant mb-4">receipt_long</mat-icon>
                 <h3 class="text-xl font-semibold text-on-surface mb-2">
-                    Nessuna fattura trovata
+                    {{ hasActiveFilters() ? 'Nessuna fattura trovata' : 'Nessuna fattura ancora' }}
                 </h3>
                 <p class="text-on-surface-variant mb-6">
-                    Inizia creando la tua prima fattura
+                    {{ hasActiveFilters() ?
+                    'Prova a modificare i criteri di ricerca' :
+                    'Inizia creando la tua prima fattura' }}
                 </p>
+                @if (!hasActiveFilters()) {
                 <button mat-raised-button color="primary" routerLink="/invoices/new">
                     <mat-icon>add</mat-icon>
                     Crea Fattura
                 </button>
+                } @else {
+                <button mat-outlined-button (click)="clearFilters()">
+                    <mat-icon>refresh</mat-icon>
+                    Mostra tutte le fatture
+                </button>
+                }
             </div>
             }
         </mat-card-content>
