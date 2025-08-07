@@ -31,7 +31,7 @@ export class AppComponent implements OnInit {
 
   title = 'OIT-invoices';
 
-  sidebarOpen = signal(true);
+  sidebarOpen = signal(false);
 
   constructor(public authService: AuthService, private router: Router) {
     // Effetto per reagire ai cambiamenti dello stato di autenticazione
@@ -45,7 +45,7 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {
     // Inizializza lo stato della sidebar in base alla dimensione dello schermo
-    this.sidebarOpen.set(this.isDesktop());
+    //this.sidebarOpen.set(this.isDesktop());
 
     // Listener per il resize della finestra
     window.addEventListener('resize', () => {

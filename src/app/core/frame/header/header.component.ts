@@ -42,6 +42,9 @@ export class HeaderComponent {
     this.authService.signOut().subscribe({
       next: () => {
         this.snackBar.open('Logout effettuato con successo', 'Chiudi', { duration: 3000 });
+        if (this.sidebarOpen()) {
+          this.toggleSidebar.emit();
+        }
         this.router.navigate(['/login']);
       },
       error: (error) => {
