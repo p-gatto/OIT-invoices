@@ -62,10 +62,21 @@ export class ProductService {
   }
 
   createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Observable<Product> {
+    // Pulisci i dati prima di inviarli a Supabase
+    const cleanProduct = {
+      name: product.name,
+      description: product.description || null,
+      unit_price: Number(product.unit_price),
+      tax_rate: Number(product.tax_rate),
+      category: product.category || null,
+      unit: product.unit || 'pz',
+      is_active: Boolean(product.is_active)
+    };
+
     return from(
       this.supabase.client
         .from('products')
-        .insert(product)
+        .insert(cleanProduct)
         .select()
         .single()
     ).pipe(

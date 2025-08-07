@@ -1,33 +1,16 @@
-<!-- <div class="page-container animate-fade-in">
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-on-surface mb-2">Prodotti</h1>
-        <p class="text-on-surface-variant">Gestisci i tuoi prodotti e servizi</p>
-    </div>
-
-    <mat-card class="surface-container">
-        <mat-card-content class="text-center py-16">
-            <mat-icon class="text-8xl text-on-surface-variant mb-4">inventory_2</mat-icon>
-            <h3 class="text-xl font-semibold text-on-surface mb-4">
-                Sezione Prodotti
-            </h3>
-            <p class="text-on-surface-variant mb-6">
-                Questa sezione sarà implementata nelle prossime versioni
-            </p>
-            <button mat-raised-button color="primary" disabled>
-                <mat-icon>add</mat-icon>
-                Aggiungi Prodotto
-            </button>
-        </mat-card-content>
-    </mat-card>
-</div> -->
-
-
 <div class="products-container animate-fade-in">
     <!-- Page Header -->
     <div class="flex justify-between items-center mb-8">
         <div>
             <h1 class="text-3xl font-bold text-on-surface mb-2">Prodotti</h1>
-            <p class="text-on-surface-variant">Gestisci i tuoi prodotti e servizi</p>
+            <p class="text-on-surface-variant">
+                Gestisci i tuoi prodotti e servizi
+                @if (hasActiveFilters()) {
+                <span class="ml-2 text-primary font-medium">
+                    ({{ getFilteredCount() }} di {{ products().length }} risultati)
+                </span>
+                }
+            </p>
         </div>
         <button mat-raised-button color="primary" (click)="openProductDialog()">
             <mat-icon>add</mat-icon>
@@ -35,20 +18,47 @@
         </button>
     </div>
 
-    <!-- Filters -->
-    <mat-card class="mb-6 surface-container">
-        <mat-card-content class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <mat-form-field appearance="outline">
+    <!-- Search and Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- Search -->
+        <mat-card class="surface-container md:col-span-2">
+            <mat-card-content class="p-4">
+                <mat-form-field appearance="outline" class="w-full">
                     <mat-label>Cerca prodotto</mat-label>
-                    <input matInput [(ngModel)]="searchQuery" (input)="applyFilter()"
+                    <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); applyFilter()"
                         placeholder="Nome, descrizione o categoria">
                     <mat-icon matSuffix>search</mat-icon>
+                    @if (searchQuery()) {
+                    <button matSuffix mat-icon-button (click)="clearFilters()" matTooltip="Pulisci ricerca">
+                        <mat-icon>clear</mat-icon>
+                    </button>
+                    }
                 </mat-form-field>
+            </mat-card-content>
+        </mat-card>
 
+        <!-- Quick Stats -->
+        <mat-card class="surface-container">
+            <mat-card-content class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold text-on-surface">{{ products().length }}</p>
+                        <p class="text-sm text-on-surface-variant">Prodotti totali</p>
+                    </div>
+                    <mat-icon class="text-4xl text-primary">inventory_2</mat-icon>
+                </div>
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Filters -->
+    <mat-card class="mb-6 surface-container">
+        <mat-card-content class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <mat-form-field appearance="outline">
                     <mat-label>Categoria</mat-label>
-                    <mat-select [(value)]="selectedCategory" (selectionChange)="applyFilter()">
+                    <mat-select [ngModel]="selectedCategory()"
+                        (ngModelChange)="selectedCategory.set($event); applyFilter()">
                         <mat-option value="">Tutte le categorie</mat-option>
                         @for (category of categories(); track category.name) {
                         <mat-option [value]="category.name">
@@ -58,30 +68,76 @@
                     </mat-select>
                 </mat-form-field>
 
-                <div class="flex items-end">
-                    <button mat-outlined-button (click)="clearFilters()" class="h-12">
-                        <mat-icon>clear</mat-icon>
+                <!-- Filtri rapidi per categoria -->
+                <div class="col-span-2 flex items-center gap-4 flex-wrap ml-10">
+                    <span class="text-sm text-on-surface-variant">Filtri rapidi:</span>
+                    @for (category of categories().slice(0, 4); track category.name) {
+                    <button mat-button (click)="setCategoryFilter(category.name)"
+                        [color]="selectedCategory() === category.name ? 'primary' : ''" class="text-xs">
+                        {{ category.name }}
+                    </button>
+                    }
+                </div>
+
+                <!--  <div class="flex col-span-1">
+                    <button mat-button (click)="clearFilters()" class="w-full h-12" [disabled]="!hasActiveFilters()">
                         Pulisci filtri
                     </button>
-                </div>
+                </div> -->
             </div>
+
+            <!-- Active Filters Display -->
+            @if (hasActiveFilters()) {
+            <div class="flex items-center gap-2 mt-4 flex-wrap">
+                <span class="text-sm text-on-surface-variant">Filtri attivi:</span>
+                @if (searchQuery()) {
+                <mat-chip (removed)="searchQuery.set('')">
+                    Ricerca: "{{ searchQuery() }}"
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                @if (selectedCategory()) {
+                <mat-chip (removed)="selectedCategory.set('')">
+                    Categoria: {{ selectedCategory() }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                <button mat-button (click)="clearFilters()" class="text-primary ml-2">
+                    <mat-icon>clear_all</mat-icon>
+                    Pulisci tutto
+                </button>
+            </div>
+            }
         </mat-card-content>
     </mat-card>
 
-    <!-- Products Table/Grid -->
+    <!-- Products Table -->
     <mat-card class="surface-container">
         <mat-card-content class="p-0">
-            @if (filteredProducts().length > 0) {
+            @if (loading()) {
+            <div class="flex justify-center items-center py-16">
+                <mat-spinner diameter="40"></mat-spinner>
+            </div>
+            } @else if (filteredProducts().length > 0) {
             <div class="overflow-x-auto">
                 <table mat-table [dataSource]="filteredProducts()" class="w-full">
                     <!-- Name Column -->
                     <ng-container matColumnDef="name">
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Prodotto</th>
                         <td mat-cell *matCellDef="let product">
-                            <div>
-                                <p class="font-medium text-on-surface">{{ product.name }}</p>
-                                <p class="text-sm text-on-surface-variant">{{ product.description || 'Nessuna
-                                    descrizione' }}</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <mat-icon class="text-primary">inventory_2</mat-icon>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-on-surface">{{ product.name }}</p>
+                                    @if (product.description) {
+                                    <p class="text-sm text-on-surface-variant line-clamp-1"
+                                        [matTooltip]="product.description">
+                                        {{ product.description }}
+                                    </p>
+                                    }
+                                </div>
                             </div>
                         </td>
                     </ng-container>
@@ -91,7 +147,11 @@
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Categoria</th>
                         <td mat-cell *matCellDef="let product">
                             @if (product.category) {
-                            <mat-chip class="text-xs">{{ product.category }}</mat-chip>
+                            <mat-chip class="text-xs cursor-pointer"
+                                (click)="setCategoryFilter(product.category); stopEventPropagation($event)"
+                                matTooltip="Filtra per questa categoria">
+                                {{ product.category }}
+                            </mat-chip>
                             } @else {
                             <span class="text-on-surface-variant text-sm">Non specificata</span>
                             }
@@ -102,8 +162,10 @@
                     <ng-container matColumnDef="price">
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Prezzo</th>
                         <td mat-cell *matCellDef="let product">
-                            <p class="font-medium text-on-surface">€{{ product.unit_price | number:'1.2-2' }}</p>
-                            <p class="text-sm text-on-surface-variant">per {{ product.unit }}</p>
+                            <div>
+                                <p class="font-medium text-on-surface">€{{ product.unit_price | number:'1.2-2' }}</p>
+                                <p class="text-sm text-on-surface-variant">per {{ getUnitLabel(product.unit) }}</p>
+                            </div>
                         </td>
                     </ng-container>
 
@@ -119,16 +181,16 @@
                     <ng-container matColumnDef="unit">
                         <th mat-header-cell *matHeaderCellDef class="font-semibold">Unità</th>
                         <td mat-cell *matCellDef="let product">
-                            <span class="text-on-surface">{{ product.unit }}</span>
+                            <span class="text-on-surface">{{ getUnitLabel(product.unit) }}</span>
                         </td>
                     </ng-container>
 
                     <!-- Actions Column -->
                     <ng-container matColumnDef="actions">
-                        <th mat-header-cell *matHeaderCellDef class="font-semibold">Azioni</th>
-                        <td mat-cell *matCellDef="let product">
+                        <th mat-header-cell *matHeaderCellDef class="font-semibold text-right">Azioni</th>
+                        <td mat-cell *matCellDef="let product" class="text-right">
                             <button mat-icon-button [matMenuTriggerFor]="actionsMenu"
-                                [matMenuTriggerData]="{product: product}">
+                                [matMenuTriggerData]="{product: product}" (click)="stopEventPropagation($event)">
                                 <mat-icon>more_vert</mat-icon>
                             </button>
                         </td>
@@ -136,7 +198,8 @@
 
                     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
                     <tr mat-row *matRowDef="let product; columns: displayedColumns;"
-                        class="hover:bg-surface-container-high cursor-pointer"></tr>
+                        class="hover:bg-surface-container-high cursor-pointer" (click)="editProduct(product)">
+                    </tr>
                 </table>
             </div>
 
@@ -144,15 +207,24 @@
             <div class="text-center py-16">
                 <mat-icon class="text-8xl text-on-surface-variant mb-4">inventory_2</mat-icon>
                 <h3 class="text-xl font-semibold text-on-surface mb-2">
-                    Nessun prodotto trovato
+                    {{ hasActiveFilters() ? 'Nessun prodotto trovato' : 'Nessun prodotto ancora' }}
                 </h3>
                 <p class="text-on-surface-variant mb-6">
-                    Inizia aggiungendo il tuo primo prodotto
+                    {{ hasActiveFilters() ?
+                    'Prova a modificare i criteri di ricerca' :
+                    'Inizia aggiungendo il tuo primo prodotto' }}
                 </p>
+                @if (!hasActiveFilters()) {
                 <button mat-raised-button color="primary" (click)="openProductDialog()">
                     <mat-icon>add</mat-icon>
                     Aggiungi Prodotto
                 </button>
+                } @else {
+                <button mat-outlined-button (click)="clearFilters()">
+                    <mat-icon>refresh</mat-icon>
+                    Mostra tutti i prodotti
+                </button>
+                }
             </div>
             }
         </mat-card-content>

@@ -14,11 +14,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { Product, ProductCategory } from './product.model';
 import { ProductService } from './product.service';
 import { ConfirmationDialogComponent } from '../../shared/components/confirmation-dialog/confirmation-dialog.component';
 import { ProductDialogComponent } from './product-dialog/product-dialog.component';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-products',
@@ -36,7 +38,9 @@ import { ProductDialogComponent } from './product-dialog/product-dialog.componen
     MatDialogModule,
     MatMenuModule,
     MatDividerModule,
-    MatChipsModule
+    MatChipsModule,
+    MatTooltipModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './products.component.html',
   styleUrl: './products.component.scss'
@@ -50,16 +54,22 @@ export class ProductsComponent implements OnInit {
 
   products = signal<Product[]>([]);
   categories = signal<ProductCategory[]>([]);
-  searchQuery = '';
-  selectedCategory = '';
+  loading = signal(true);
+
+  // Signal per i filtri - stessa struttura del CustomersComponent
+  searchQuery = signal('');
+  selectedCategory = signal('');
 
   displayedColumns = ['name', 'category', 'price', 'tax_rate', 'unit', 'actions'];
 
+  // Computed per i prodotti filtrati - logica simile a CustomersComponent
   filteredProducts = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const category = this.selectedCategory();
     let filtered = this.products();
 
-    if (this.searchQuery) {
-      const query = this.searchQuery.toLowerCase();
+    // Filtra per ricerca se presente
+    if (query) {
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(query) ||
         product.description?.toLowerCase().includes(query) ||
@@ -67,8 +77,9 @@ export class ProductsComponent implements OnInit {
       );
     }
 
-    if (this.selectedCategory) {
-      filtered = filtered.filter(product => product.category === this.selectedCategory);
+    // Filtra per categoria se selezionata
+    if (category) {
+      filtered = filtered.filter(product => product.category === category);
     }
 
     return filtered;
@@ -79,28 +90,95 @@ export class ProductsComponent implements OnInit {
   }
 
   private loadData() {
-    this.productService.getProducts().subscribe(products => {
-      this.products.set(products);
+    this.loading.set(true);
+
+    this.productService.getProducts().subscribe({
+      next: products => {
+        this.products.set(products);
+        this.loading.set(false);
+      },
+      error: error => {
+        this.loading.set(false);
+        this.snackBar.open('Errore nel caricamento dei prodotti', 'Chiudi', { duration: 3000 });
+        console.error('Error loading products:', error);
+      }
     });
 
-    this.productService.getProductCategories().subscribe(categories => {
-      this.categories.set(categories);
+    this.productService.getProductCategories().subscribe({
+      next: categories => {
+        this.categories.set(categories);
+      },
+      error: error => {
+        console.error('Error loading categories:', error);
+      }
     });
   }
 
+  /**
+   * Applica i filtri di ricerca
+   * Con i signal, il computed filteredProducts si aggiorna automaticamente
+   * quando cambia searchQuery o selectedCategory
+   */
   applyFilter() {
-    // Triggers computed signal recalculation
+    // Con i signal, questo metodo può essere utilizzato per logiche aggiuntive
+    // come logging, analytics, o validazioni
+    const query = this.searchQuery().trim();
+    const category = this.selectedCategory();
+
+    // Il computed filteredProducts si aggiorna automaticamente
+    // grazie alla reattività dei signal
   }
 
+  /**
+   * Pulisce tutti i filtri
+   */
   clearFilters() {
-    this.searchQuery = '';
-    this.selectedCategory = '';
+    this.searchQuery.set('');
+    this.selectedCategory.set('');
+  }
+
+  /**
+   * Imposta un filtro di ricerca specifico
+   */
+  setFilter(query: string) {
+    this.searchQuery.set(query);
+  }
+
+  /**
+   * Imposta un filtro categoria specifico
+   */
+  setCategoryFilter(category: string) {
+    this.selectedCategory.set(category);
+  }
+
+  /**
+   * Restituisce il numero di risultati filtrati
+   */
+  getFilteredCount(): number {
+    return this.filteredProducts().length;
+  }
+
+  /**
+   * Verifica se sono attivi dei filtri
+   */
+  hasActiveFilters(): boolean {
+    return this.searchQuery().trim().length > 0 || this.selectedCategory().length > 0;
+  }
+
+  /**
+   * METODO FONDAMENTALE: Ferma la propagazione del click event
+   * Questo impedisce che il click sul bottone menu attivi il click sulla riga
+   */
+  stopEventPropagation(event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
   }
 
   openProductDialog(product?: Product) {
     const dialogRef = this.dialog.open(ProductDialogComponent, {
       width: '600px',
-      data: product ? { ...product } : null
+      data: product ? { ...product } : null,
+      disableClose: true
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -146,6 +224,7 @@ export class ProductsComponent implements OnInit {
 
   deleteProduct(product: Product) {
     const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '500px',
       data: {
         title: 'Elimina Prodotto',
         message: `Sei sicuro di voler eliminare "${product.name}"?`,
@@ -156,28 +235,64 @@ export class ProductsComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.productService.deleteProduct(product.id!).subscribe({
-          next: () => {
-            this.snackBar.open('Prodotto eliminato con successo', 'Chiudi', { duration: 3000 });
-            this.loadData();
-          },
-          error: (error) => {
-            this.snackBar.open('Errore nell\'eliminazione del prodotto', 'Chiudi', { duration: 3000 });
-            console.error('Error deleting product:', error);
-          }
-        });
+        this.performDelete(product.id!, product.name);
+      }
+    });
+  }
+
+  private performDelete(productId: string, productName: string) {
+    this.productService.deleteProduct(productId).subscribe({
+      next: () => {
+        this.snackBar.open(`Prodotto "${productName}" eliminato con successo`, 'Chiudi', { duration: 3000 });
+        this.loadData();
+      },
+      error: (error) => {
+        this.snackBar.open('Errore nell\'eliminazione del prodotto', 'Chiudi', { duration: 3000 });
+        console.error('Error deleting product:', error);
       }
     });
   }
 
   duplicateProduct(product: Product) {
-    const duplicatedProduct = {
-      ...product,
-      name: `${product.name} (Copia)`,
-      id: undefined,
-      created_at: undefined,
-      updated_at: undefined
+    // Crea una copia pulita del prodotto rimuovendo tutti i campi di sistema
+    const { id, created_at, updated_at, ...productData } = product;
+
+    const duplicatedProduct: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
+      ...productData,
+      name: `${product.name} (Copia)`
     };
+
     this.openProductDialog(duplicatedProduct);
   }
+
+  /**
+   * Cerca prodotti per nome (utilità per ricerche rapide)
+   */
+  searchByName(name: string) {
+    this.setFilter(name);
+  }
+
+  /**
+   * Cerca prodotti per categoria (utilità per ricerche rapide)
+   */
+  searchByCategory(category: string) {
+    this.setCategoryFilter(category);
+  }
+
+  /**
+   * Restituisce l'etichetta user-friendly per l'unità di misura
+   */
+  getUnitLabel(unit: string): string {
+    const unitLabels: { [key: string]: string } = {
+      'pz': 'Pezzo',
+      'ore': 'Ore',
+      'kg': 'Kg',
+      'm': 'Metro',
+      'mq': 'Metro²',
+      'giorni': 'Giorni',
+      'mesi': 'Mesi'
+    };
+    return unitLabels[unit] || unit;
+  }
+
 }

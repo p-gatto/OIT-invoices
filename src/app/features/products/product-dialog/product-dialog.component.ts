@@ -46,8 +46,38 @@ export class ProductDialogComponent {
 
   onSubmit() {
     if (this.productForm.valid) {
-      const result = { ...this.data, ...this.productForm.value };
+      const formValue = this.productForm.value;
+
+      // Crea l'oggetto risultato con validazione esplicita di ogni campo
+      const result: Partial<Product> = {
+        name: formValue.name?.trim() || '',
+        unit_price: Number(formValue.unit_price) || 0,
+        tax_rate: Number(formValue.tax_rate) || 0,
+        unit: formValue.unit || 'pz',
+        is_active: Boolean(formValue.is_active)
+      };
+
+      // Aggiungi ID solo se stiamo modificando un prodotto esistente
+      if (this.data?.id) {
+        result.id = this.data.id;
+      }
+
+      // Aggiungi description solo se non è vuota
+      if (formValue.description?.trim()) {
+        result.description = formValue.description.trim();
+      }
+
+      // Aggiungi category solo se non è vuota
+      if (formValue.category?.trim()) {
+        result.category = formValue.category.trim();
+      }
+
       this.dialogRef.close(result);
+    } else {
+      // Marca tutti i campi come touched per mostrare gli errori
+      Object.keys(this.productForm.controls).forEach(key => {
+        this.productForm.get(key)?.markAsTouched();
+      });
     }
   }
 

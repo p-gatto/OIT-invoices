@@ -1,11 +1,164 @@
-.page-container {
+.products-container {
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
 }
 
+.text-error {
+    color: var(--mat-sys-error);
+}
+
+// Stili per i chip categoria cliccabili
+.mat-mdc-chip.cursor-pointer:hover {
+    background-color: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+// Miglioramenti per le righe della tabella
+.mat-mdc-row:hover {
+    background-color: var(--mat-sys-surface-container-high);
+    transform: translateY(-1px);
+    box-shadow: var(--mat-sys-elevation-1);
+    transition: all 0.2s ease;
+}
+
+// Stili per i filtri rapidi
+.quick-filter-button {
+    min-width: auto;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border-radius: 1rem;
+    transition: all 0.2s ease;
+
+    &.active {
+        background-color: var(--mat-sys-primary-container);
+        color: var(--mat-sys-on-primary-container);
+    }
+
+    &:hover:not(.active) {
+        background-color: var(--mat-sys-surface-container-high);
+    }
+}
+
+// Stili per i chip dei filtri attivi
+.mat-mdc-chip {
+    &.filter-chip {
+        background-color: var(--mat-sys-secondary-container);
+        color: var(--mat-sys-on-secondary-container);
+
+        .mat-mdc-chip-remove {
+            color: var(--mat-sys-on-secondary-container);
+            opacity: 0.7;
+
+            &:hover {
+                opacity: 1;
+                background-color: var(--mat-sys-error-container);
+                color: var(--mat-sys-on-error-container);
+            }
+        }
+    }
+}
+
+// Miglioramenti per il layout responsive
 @media (max-width: 768px) {
-    .page-container {
+    .products-container {
         padding: 1rem;
+    }
+
+    // Stack dei filtri su mobile
+    .grid-cols-1.md\:grid-cols-4 {
+        gap: 1rem;
+
+        .col-span-2 {
+            grid-column: span 1;
+        }
+
+        .flex.items-center.gap-2 {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+    }
+
+    // Riduci dimensioni delle icone delle statistiche
+    .text-4xl {
+        font-size: 2rem;
+    }
+}
+
+// Animazioni per i filtri
+.filter-transition {
+    transition: all 0.3s ease;
+}
+
+// Stili per lo stato di caricamento
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
+
+    .mat-mdc-progress-spinner {
+        margin-bottom: 0.5rem;
+    }
+}
+
+// Miglioramenti per la visualizzazione delle descrizioni troncate
+.line-clamp-1 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// Stili per l'icona del prodotto
+.product-icon {
+    transition: transform 0.2s ease;
+
+    .mat-mdc-row:hover & {
+        transform: scale(1.1);
+    }
+}
+
+// Miglioramenti per l'accessibilità
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+// Stili per il focus
+.mat-mdc-button:focus-visible,
+.mat-mdc-icon-button:focus-visible,
+.mat-mdc-chip:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+}
+
+// Animazione per i risultati dei filtri
+.filter-results-enter {
+    animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }
