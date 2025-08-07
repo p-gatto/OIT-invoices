@@ -1,74 +1,181 @@
 <div class="help-container animate-fade-in">
+    <!-- Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-on-surface mb-2">Centro Assistenza</h1>
         <p class="text-on-surface-variant">Trova risposte alle tue domande</p>
     </div>
 
-    <!-- FAQ Section -->
-    <mat-card class="surface-container mb-8">
-        <mat-card-header>
-            <mat-card-title class="text-on-surface">Domande Frequenti</mat-card-title>
-        </mat-card-header>
+    <!-- Search and Filters -->
+    <mat-card class="surface-container mb-6">
         <mat-card-content class="p-6">
-            <mat-accordion>
-                <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                        <mat-panel-title>Come creo una nuova fattura?</mat-panel-title>
-                    </mat-expansion-panel-header>
-                    <p>Per creare una nuova fattura, clicca sul pulsante "Nuova Fattura" nella sezione Fatture.
-                        Compila tutti i campi richiesti e aggiungi le righe della fattura.</p>
-                </mat-expansion-panel>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Search -->
+                <mat-form-field appearance="outline" class="md:col-span-2">
+                    <mat-label>Cerca negli articoli</mat-label>
+                    <input matInput [(ngModel)]="searchQuery" (input)="onSearch()"
+                        placeholder="Digita la tua domanda o parole chiave">
+                    <mat-icon matSuffix>search</mat-icon>
+                    @if (isSearching()) {
+                    <mat-spinner matSuffix diameter="20"></mat-spinner>
+                    }
+                </mat-form-field>
 
-                <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                        <mat-panel-title>Come posso esportare una fattura in PDF?</mat-panel-title>
-                    </mat-expansion-panel-header>
-                    <p>Nella pagina di dettaglio della fattura, clicca sul pulsante "Scarica PDF" per generare
-                        e scaricare automaticamente il file PDF della fattura.</p>
-                </mat-expansion-panel>
+                <!-- Category Filter -->
+                <mat-form-field appearance="outline">
+                    <mat-label>Categoria</mat-label>
+                    <select matNativeControl [(ngModel)]="selectedCategory"
+                        (change)="onCategorySelect(selectedCategory())">
+                        <option value="">Tutte le categorie</option>
+                        @for (category of categories(); track category.category) {
+                        <option [value]="category.category">
+                            {{ category.category }} ({{ category.count }})
+                        </option>
+                        }
+                    </select>
+                </mat-form-field>
+            </div>
 
-                <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                        <mat-panel-title>Come gestisco i miei clienti?</mat-panel-title>
-                    </mat-expansion-panel-header>
-                    <p>Vai alla sezione "Clienti" dal menu laterale. Qui puoi aggiungere, modificare ed eliminare
-                        i tuoi clienti. I clienti salvati saranno disponibili durante la creazione delle fatture.</p>
-                </mat-expansion-panel>
-
-                <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                        <mat-panel-title>Posso modificare una fattura già inviata?</mat-panel-title>
-                    </mat-expansion-panel-header>
-                    <p>Sì, puoi modificare qualsiasi fattura cliccando sul pulsante "Modifica" nella pagina di
-                        dettaglio. Tuttavia, ti consigliamo di fare attenzione quando modifichi fatture già inviate.</p>
-                </mat-expansion-panel>
-            </mat-accordion>
+            <!-- Active Filters -->
+            @if (searchQuery() || selectedCategory()) {
+            <div class="flex items-center gap-2 mt-4">
+                <span class="text-sm text-on-surface-variant">Filtri attivi:</span>
+                @if (searchQuery()) {
+                <mat-chip (removed)="searchQuery.set('')">
+                    Ricerca: "{{ searchQuery() }}"
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                @if (selectedCategory()) {
+                <mat-chip (removed)="selectedCategory.set('')">
+                    Categoria: {{ selectedCategory() }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+                }
+                <button mat-button (click)="clearFilters()" class="text-primary ml-2">
+                    <mat-icon>clear_all</mat-icon>
+                    Pulisci tutto
+                </button>
+            </div>
+            }
         </mat-card-content>
     </mat-card>
 
-    <!-- Contact Support -->
+    <!-- Loading State -->
+    @if (loading()) {
     <mat-card class="surface-container">
+        <mat-card-content class="text-center py-16">
+            <mat-spinner diameter="40" class="mx-auto mb-4"></mat-spinner>
+            <p class="text-on-surface-variant">Caricamento articoli...</p>
+        </mat-card-content>
+    </mat-card>
+    } @else {
+
+    <!-- Articles Content -->
+    @if (articlesByCategory().length > 0) {
+    <!-- Articles by Category -->
+    @for (categoryGroup of articlesByCategory(); track categoryGroup.category) {
+    <mat-card class="surface-container mb-6">
         <mat-card-header>
-            <mat-card-title class="text-on-surface">Contatta il Supporto</mat-card-title>
+            <mat-card-title class="text-on-surface flex items-center gap-2">
+                <mat-icon>{{ getCategoryIcon(categoryGroup.category) }}</mat-icon>
+                {{ categoryGroup.category }}
+                <mat-chip class="ml-2">{{ categoryGroup.articles.length }}</mat-chip>
+            </mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-6">
+            <mat-accordion>
+                @for (article of categoryGroup.articles; track article.id) {
+                <mat-expansion-panel>
+                    <mat-expansion-panel-header>
+                        <mat-panel-title class="text-on-surface">
+                            {{ article.title }}
+                        </mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <div class="prose prose-sm max-w-none">
+                        <div [innerHTML]="convertMarkdownToHtml(article.content)"
+                            class="text-on-surface-variant leading-relaxed"></div>
+                    </div>
+                </mat-expansion-panel>
+                }
+            </mat-accordion>
+        </mat-card-content>
+    </mat-card>
+    }
+    } @else {
+    <!-- No Articles Found -->
+    <mat-card class="surface-container">
+        <mat-card-content class="text-center py-16">
+            @if (searchQuery() || selectedCategory()) {
+            <!-- No Results -->
+            <mat-icon class="text-6xl text-on-surface-variant mb-4">search_off</mat-icon>
+            <h3 class="text-xl font-semibold text-on-surface mb-2">
+                Nessun articolo trovato
+            </h3>
+            <p class="text-on-surface-variant mb-6">
+                Non abbiamo trovato articoli corrispondenti ai tuoi criteri di ricerca.
+                Prova a modificare i filtri o i termini di ricerca.
+            </p>
+            <button mat-raised-button color="primary" (click)="clearFilters()">
+                <mat-icon>refresh</mat-icon>
+                Mostra tutti gli articoli
+            </button>
+            } @else {
+            <!-- No Articles in Database -->
+            <mat-icon class="text-8xl text-on-surface-variant mb-4">help_outline</mat-icon>
+            <h3 class="text-xl font-semibold text-on-surface mb-2">
+                Centro Assistenza
+            </h3>
+            <p class="text-on-surface-variant mb-6">
+                Gli articoli di aiuto non sono ancora disponibili.
+                Controlla più tardi o contatta il supporto per assistenza.
+            </p>
+            }
+        </mat-card-content>
+    </mat-card>
+    }
+    }
+
+    <!-- Contact Support Section -->
+    <mat-card class="surface-container mt-8">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Non trovi quello che cerchi?</mat-card-title>
+            <mat-card-subtitle class="text-on-surface-variant">
+                Contatta il nostro team di supporto
+            </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Email Support -->
                 <div class="text-center">
-                    <mat-icon class="text-6xl text-primary mb-4">email</mat-icon>
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                        <mat-icon class="text-primary text-2xl">email</mat-icon>
+                    </div>
                     <h3 class="font-semibold text-on-surface mb-2">Email</h3>
-                    <p class="text-on-surface-variant">support&#64;invoiceapp.com</p>
+                    <p class="text-on-surface-variant mb-3">support&#64;oit.it</p>
+                    <p class="text-sm text-on-surface-variant">Risposta entro 24 ore</p>
                 </div>
 
+                <!-- Phone Support -->
                 <div class="text-center">
-                    <mat-icon class="text-6xl text-primary mb-4">phone</mat-icon>
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary/10 flex items-center justify-center">
+                        <mat-icon class="text-secondary text-2xl">phone</mat-icon>
+                    </div>
                     <h3 class="font-semibold text-on-surface mb-2">Telefono</h3>
-                    <p class="text-on-surface-variant">+39 02 1234567</p>
+                    <p class="text-on-surface-variant mb-3">+39 02 1234567</p>
+                    <p class="text-sm text-on-surface-variant">Lun-Ven: 9:00-18:00</p>
                 </div>
 
+                <!-- Live Chat -->
                 <div class="text-center">
-                    <mat-icon class="text-6xl text-primary mb-4">schedule</mat-icon>
-                    <h3 class="font-semibold text-on-surface mb-2">Orari</h3>
-                    <p class="text-on-surface-variant">Lun-Ven: 9:00-18:00</p>
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
+                        <mat-icon class="text-accent text-2xl">chat</mat-icon>
+                    </div>
+                    <h3 class="font-semibold text-on-surface mb-2">Chat dal vivo</h3>
+                    <p class="text-on-surface-variant mb-3">Disponibile ora</p>
+                    <button mat-raised-button color="primary" disabled>
+                        <mat-icon>chat_bubble</mat-icon>
+                        Avvia Chat
+                    </button>
                 </div>
             </div>
         </mat-card-content>
