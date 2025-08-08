@@ -1,4 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,11 +10,13 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
 import { Invoice } from '../invoice.model';
 import { InvoiceService } from '../invoice.service';
+
 import { PdfService } from '../../../core/print/pdf.service';
+import { ConfirmationDialogComponent } from '../../../shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-invoice-detail',
@@ -24,7 +28,8 @@ import { PdfService } from '../../../core/print/pdf.service';
     MatIconModule,
     MatDividerModule,
     MatChipsModule,
-    MatMenuModule
+    MatMenuModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './invoice-detail.component.html',
   styleUrl: './invoice-detail.component.scss'
@@ -40,6 +45,7 @@ export class InvoiceDetailComponent implements OnInit {
 
   invoice = signal<Invoice | null>(null);
   loading = signal(true);
+  updating = signal(false);
 
   constructor() { }
 
@@ -47,57 +53,32 @@ export class InvoiceDetailComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.loadInvoice(id);
+    } else {
+      this.snackBar.open('ID fattura non valido', 'Chiudi', { duration: 3000 });
+      this.router.navigate(['/invoices']);
     }
   }
 
   private loadInvoice(id: string) {
-    // Simulate loading invoice from service
-    // In real app, this would call invoiceService.getInvoiceById(id)
-    setTimeout(() => {
-      const mockInvoice: Invoice = {
-        id: id,
-        invoice_number: 'INV-2025-001234',
-        customer_id: 'customer-1',
-        customer: {
-          id: 'customer-1',
-          name: 'Azienda Cliente SRL',
-          email: 'info@aziendacliente.com',
-          phone: '+39 02 1234567',
-          address: 'Via Roma 123, 20100 Milano (MI)',
-          tax_code: 'RSSMRA80A01F205X',
-          vat_number: '12345678901'
-        },
-        issue_date: '2025-01-15',
-        due_date: '2025-02-15',
-        subtotal: 1000.00,
-        tax_amount: 220.00,
-        total: 1220.00,
-        status: 'sent',
-        notes: 'Pagamento entro 30 giorni dalla data di emissione.',
-        items: [
-          {
-            id: '1',
-            description: 'Sviluppo Applicazione Web',
-            quantity: 1,
-            unit_price: 800.00,
-            tax_rate: 22,
-            total: 976.00
-          },
-          {
-            id: '2',
-            description: 'Consulenza Tecnica',
-            quantity: 4,
-            unit_price: 50.00,
-            tax_rate: 22,
-            total: 244.00
-          }
-        ],
-        created_at: '2025-01-15T10:30:00Z'
-      };
+    this.loading.set(true);
 
-      this.invoice.set(mockInvoice);
-      this.loading.set(false);
-    }, 1000);
+    this.invoiceService.getInvoiceById(id).subscribe({
+      next: (invoice) => {
+        if (invoice) {
+          this.invoice.set(invoice);
+        } else {
+          this.snackBar.open('Fattura non trovata', 'Chiudi', { duration: 3000 });
+          this.router.navigate(['/invoices']);
+        }
+        this.loading.set(false);
+      },
+      error: (error) => {
+        this.loading.set(false);
+        this.snackBar.open('Errore durante il caricamento della fattura', 'Chiudi', { duration: 5000 });
+        console.error('Error loading invoice:', error);
+        this.router.navigate(['/invoices']);
+      }
+    });
   }
 
   getDaysToDeadline(): number {
@@ -140,8 +121,13 @@ export class InvoiceDetailComponent implements OnInit {
   downloadPDF() {
     const invoice = this.invoice();
     if (invoice) {
-      this.pdfService.generateInvoicePDF(invoice);
-      this.snackBar.open('PDF generato con successo', 'Chiudi', { duration: 3000 });
+      try {
+        this.pdfService.generateInvoicePDF(invoice);
+        this.snackBar.open('PDF generato con successo', 'Chiudi', { duration: 3000 });
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        this.snackBar.open('Errore durante la generazione del PDF', 'Chiudi', { duration: 3000 });
+      }
     }
   }
 
@@ -152,15 +138,31 @@ export class InvoiceDetailComponent implements OnInit {
   duplicateInvoice() {
     const invoice = this.invoice();
     if (invoice) {
-      // Navigate to form with duplicated data
-      this.router.navigate(['/invoices/new'], {
-        queryParams: { duplicate: invoice.id }
+      this.updating.set(true);
+
+      this.invoiceService.duplicateInvoice(invoice.id!).subscribe({
+        next: (duplicatedInvoice) => {
+          this.updating.set(false);
+          this.snackBar.open('Fattura duplicata con successo', 'Chiudi', { duration: 3000 });
+          this.router.navigate(['/invoices', duplicatedInvoice.id, 'edit']);
+        },
+        error: (error) => {
+          this.updating.set(false);
+          this.snackBar.open('Errore durante la duplicazione', 'Chiudi', { duration: 3000 });
+          console.error('Error duplicating invoice:', error);
+        }
       });
     }
   }
 
   sendInvoice() {
-    this.snackBar.open('Fattura inviata via email', 'Chiudi', { duration: 3000 });
+    const invoice = this.invoice();
+    if (invoice && invoice.customer?.email) {
+      // TODO: Implementare invio email
+      this.snackBar.open('Fattura inviata via email', 'Chiudi', { duration: 3000 });
+    } else {
+      this.snackBar.open('Il cliente non ha un indirizzo email configurato', 'Chiudi', { duration: 3000 });
+    }
   }
 
   markAsSent() {
@@ -171,18 +173,62 @@ export class InvoiceDetailComponent implements OnInit {
     this.updateInvoiceStatus('paid');
   }
 
-  private updateInvoiceStatus(status: string) {
+  private updateInvoiceStatus(status: Invoice['status']) {
     const invoice = this.invoice();
-    if (invoice) {
-      this.invoice.set({ ...invoice, status: status as any });
-      this.snackBar.open(`Fattura aggiornata: ${this.getStatusLabel(status)}`, 'Chiudi', { duration: 3000 });
-    }
+    if (!invoice?.id) return;
+
+    this.updating.set(true);
+
+    this.invoiceService.updateInvoiceStatus(invoice.id, status).subscribe({
+      next: (updatedInvoice) => {
+        this.updating.set(false);
+        this.invoice.set(updatedInvoice);
+        this.snackBar.open(`Fattura aggiornata: ${this.getStatusLabel(status)}`, 'Chiudi', { duration: 3000 });
+      },
+      error: (error) => {
+        this.updating.set(false);
+        this.snackBar.open('Errore durante l\'aggiornamento dello stato', 'Chiudi', { duration: 3000 });
+        console.error('Error updating invoice status:', error);
+      }
+    });
   }
 
   deleteInvoice() {
-    // Show confirmation dialog
-    this.snackBar.open('Fattura eliminata', 'Chiudi', { duration: 3000 });
-    this.router.navigate(['/invoices']);
+    const invoice = this.invoice();
+    if (!invoice) return;
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '500px',
+      data: {
+        title: 'Conferma Eliminazione',
+        message: `Sei sicuro di voler eliminare la fattura ${invoice.invoice_number}? Questa operazione è irreversibile.`,
+        confirmText: 'Elimina',
+        cancelText: 'Annulla'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result && invoice.id) {
+        this.performDelete(invoice.id, invoice.invoice_number);
+      }
+    });
+  }
+
+  private performDelete(invoiceId: string, invoiceNumber: string) {
+    this.updating.set(true);
+
+    this.invoiceService.deleteInvoice(invoiceId).subscribe({
+      next: () => {
+        this.updating.set(false);
+        this.snackBar.open(`Fattura ${invoiceNumber} eliminata con successo`, 'Chiudi', { duration: 3000 });
+        this.router.navigate(['/invoices']);
+      },
+      error: (error) => {
+        this.updating.set(false);
+        this.snackBar.open('Errore durante l\'eliminazione della fattura', 'Chiudi', { duration: 3000 });
+        console.error('Error deleting invoice:', error);
+      }
+    });
   }
 
   goBack() {

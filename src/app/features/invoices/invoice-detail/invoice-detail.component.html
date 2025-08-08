@@ -1,48 +1,59 @@
 <div class="invoice-detail-container animate-fade-in">
-    @if (invoice(); as inv) {
+    @if (loading()) {
+    <!-- Loading State -->
+    <div class="flex justify-center items-center h-64">
+        <div class="text-center">
+            <mat-spinner diameter="40" class="mb-4"></mat-spinner>
+            <p class="text-on-surface-variant">Caricamento fattura...</p>
+        </div>
+    </div>
+    } @else if (invoice()) {
     <!-- Header with Actions -->
     <div class="flex justify-between items-start mb-8">
         <div>
             <div class="flex items-center gap-2 mb-4">
-                <button mat-icon-button (click)="goBack()">
+                <button mat-icon-button (click)="goBack()" [disabled]="updating()">
                     <mat-icon>arrow_back</mat-icon>
                 </button>
-                <h1 class="text-3xl font-bold text-on-surface">{{ inv.invoice_number }}</h1>
-                <mat-chip [class]="getStatusClass(inv.status)">
-                    {{ getStatusLabel(inv.status) }}
+                <h1 class="text-3xl font-bold text-on-surface">{{ invoice()!.invoice_number }}</h1>
+                <mat-chip [class]="getStatusClass(invoice()!.status)">
+                    {{ getStatusLabel(invoice()!.status) }}
                 </mat-chip>
             </div>
             <p class="text-on-surface-variant">
-                Creata il {{ inv.created_at | date:'dd/MM/yyyy HH:mm' }}
+                Creata il {{ invoice()!.created_at | date:'dd/MM/yyyy HH:mm' }}
+                @if (invoice()!.updated_at && invoice()!.updated_at !== invoice()!.created_at) {
+                <span class="ml-2">• Aggiornata il {{ invoice()!.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
+                }
             </p>
         </div>
 
         <div class="flex gap-2">
-            <button mat-outlined-button [matMenuTriggerFor]="actionsMenu">
+            <button mat-outlined-button [matMenuTriggerFor]="actionsMenu" [disabled]="updating()">
                 <mat-icon>more_vert</mat-icon>
                 Azioni
             </button>
-            <button mat-raised-button color="primary" (click)="downloadPDF()">
+            <button mat-raised-button color="primary" (click)="downloadPDF()" [disabled]="updating()">
                 <mat-icon>download</mat-icon>
                 Scarica PDF
             </button>
         </div>
 
         <mat-menu #actionsMenu="matMenu">
-            <button mat-menu-item [routerLink]="['/invoices', inv.id, 'edit']">
+            <button mat-menu-item [routerLink]="['/invoices', invoice()!.id, 'edit']" [disabled]="updating()">
                 <mat-icon>edit</mat-icon>
                 <span>Modifica</span>
             </button>
-            <button mat-menu-item (click)="duplicateInvoice()">
+            <button mat-menu-item (click)="duplicateInvoice()" [disabled]="updating()">
                 <mat-icon>content_copy</mat-icon>
                 <span>Duplica</span>
             </button>
-            <button mat-menu-item (click)="sendInvoice()">
+            <button mat-menu-item (click)="sendInvoice()" [disabled]="updating()">
                 <mat-icon>email</mat-icon>
                 <span>Invia via Email</span>
             </button>
             <mat-divider></mat-divider>
-            <button mat-menu-item (click)="deleteInvoice()" class="text-error">
+            <button mat-menu-item (click)="deleteInvoice()" class="text-error" [disabled]="updating()">
                 <mat-icon>delete</mat-icon>
                 <span>Elimina</span>
             </button>
@@ -60,11 +71,12 @@
                         <div>
                             <h2 class="text-2xl font-bold text-primary mb-2">FATTURA</h2>
                             <div class="text-sm text-on-surface-variant space-y-1">
-                                <p>Numero: <span class="font-medium text-on-surface">{{ inv.invoice_number }}</span></p>
-                                <p>Data: <span class="font-medium text-on-surface">{{ inv.issue_date | date:'dd/MM/yyyy'
+                                <p>Numero: <span class="font-medium text-on-surface">{{ invoice()!.invoice_number
                                         }}</span></p>
-                                @if (inv.due_date) {
-                                <p>Scadenza: <span class="font-medium text-on-surface">{{ inv.due_date |
+                                <p>Data: <span class="font-medium text-on-surface">{{ invoice()!.issue_date |
+                                        date:'dd/MM/yyyy' }}</span></p>
+                                @if (invoice()!.due_date) {
+                                <p>Scadenza: <span class="font-medium text-on-surface">{{ invoice()!.due_date |
                                         date:'dd/MM/yyyy' }}</span></p>
                                 }
                             </div>
@@ -80,52 +92,96 @@
                     </div>
 
                     <!-- Customer Info -->
+                    @if (invoice()!.customer) {
                     <div class="mb-8">
                         <h3 class="font-semibold text-on-surface mb-4">Fatturato a:</h3>
                         <div class="bg-surface-container-high p-4 rounded-lg">
-                            <h4 class="font-bold text-on-surface text-lg">{{ inv.customer?.name }}</h4>
-                            @if (inv.customer?.email) {
-                            <p class="text-on-surface-variant">{{ inv.customer?.email }}</p>
+                            <h4 class="font-bold text-on-surface text-lg">{{ invoice()!.customer?.name }}</h4>
+                            @if (invoice()!.customer?.email) {
+                            <p class="text-on-surface-variant flex items-center gap-1 mt-1">
+                                <mat-icon class="text-sm">email</mat-icon>
+                                <a [href]="'mailto:' + invoice()!.customer?.email" class="text-primary hover:underline">
+                                    {{ invoice()!.customer?.email }}
+                                </a>
+                            </p>
                             }
-                            @if (inv.customer?.phone) {
-                            <p class="text-on-surface-variant">{{ inv.customer?.phone }}</p>
+                            @if (invoice()!.customer?.phone) {
+                            <p class="text-on-surface-variant flex items-center gap-1">
+                                <mat-icon class="text-sm">phone</mat-icon>
+                                <a [href]="'tel:' + invoice()!.customer?.phone" class="text-primary hover:underline">
+                                    {{ invoice()!.customer?.phone }}
+                                </a>
+                            </p>
                             }
-                            @if (inv.customer?.address) {
-                            <p class="text-on-surface-variant">{{ inv.customer?.address }}</p>
+                            @if (invoice()!.customer?.address) {
+                            <p class="text-on-surface-variant flex items-start gap-1 mt-2">
+                                <mat-icon class="text-sm mt-0.5">location_on</mat-icon>
+                                <span>{{ invoice()!.customer?.address }}</span>
+                            </p>
                             }
-                            @if (inv.customer?.tax_code) {
-                            <p class="text-on-surface-variant">C.F.: {{ inv.customer?.tax_code }}</p>
-                            }
-                            @if (inv.customer?.vat_number) {
-                            <p class="text-on-surface-variant">P.IVA: {{ inv.customer?.vat_number }}</p>
+                            @if (invoice()!.customer?.tax_code || invoice()!.customer?.vat_number) {
+                            <div class="flex gap-4 mt-2 text-sm">
+                                @if (invoice()!.customer?.tax_code) {
+                                <p class="text-on-surface-variant">
+                                    <span class="font-medium">C.F.:</span> {{ invoice()!.customer?.tax_code }}
+                                </p>
+                                }
+                                @if (invoice()!.customer?.vat_number) {
+                                <p class="text-on-surface-variant">
+                                    <span class="font-medium">P.IVA:</span> {{ invoice()!.customer?.vat_number }}
+                                </p>
+                                }
+                            </div>
                             }
                         </div>
                     </div>
+                    }
 
                     <!-- Invoice Items -->
+                    @if (invoice()!.items && invoice()!.items.length > 0) {
                     <div class="mb-8">
                         <h3 class="font-semibold text-on-surface mb-4">Dettagli:</h3>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead>
                                     <tr class="border-b border-outline-variant">
-                                        <th class="text-left py-2 text-on-surface-variant text-sm font-medium">
+                                        <th class="text-left py-3 text-on-surface-variant text-sm font-medium">
                                             Descrizione</th>
-                                        <th class="text-center py-2 text-on-surface-variant text-sm font-medium">Qty
+                                        <th class="text-center py-3 text-on-surface-variant text-sm font-medium">Qty
                                         </th>
-                                        <th class="text-right py-2 text-on-surface-variant text-sm font-medium">Prezzo
+                                        <th class="text-right py-3 text-on-surface-variant text-sm font-medium">Prezzo
                                         </th>
-                                        <th class="text-center py-2 text-on-surface-variant text-sm font-medium">IVA
+                                        <th class="text-center py-3 text-on-surface-variant text-sm font-medium">IVA
                                         </th>
-                                        <th class="text-right py-2 text-on-surface-variant text-sm font-medium">Totale
+                                        <th class="text-right py-3 text-on-surface-variant text-sm font-medium">Totale
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @for (item of inv.items; track item.id) {
-                                    <tr class="border-b border-outline-variant">
-                                        <td class="py-3 text-on-surface">{{ item.description }}</td>
-                                        <td class="py-3 text-center text-on-surface">{{ item.quantity }}</td>
+                                    @for (item of invoice()!.items; track item.id || $index) {
+                                    <tr
+                                        class="border-b border-outline-variant hover:bg-surface-container-high transition-colors">
+                                        <td class="py-3 text-on-surface">
+                                            <div>
+                                                {{ item.description }}
+                                                @if (item.product) {
+                                                <div
+                                                    class="text-xs text-on-surface-variant mt-1 flex items-center gap-1">
+                                                    <mat-icon class="text-xs">inventory_2</mat-icon>
+                                                    <span>Prodotto: {{ item.product.name }}</span>
+                                                    @if (item.product.category) {
+                                                    <mat-chip class="text-xs">{{ item.product.category }}</mat-chip>
+                                                    }
+                                                </div>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="py-3 text-center text-on-surface">
+                                            {{ item.quantity }}
+                                            @if (item.unit && item.unit !== 'pz') {
+                                            <span class="text-xs text-on-surface-variant ml-1">{{ item.unit }}</span>
+                                            }
+                                        </td>
                                         <td class="py-3 text-right text-on-surface">€{{ item.unit_price | number:'1.2-2'
                                             }}</td>
                                         <td class="py-3 text-center text-on-surface">{{ item.tax_rate }}%</td>
@@ -137,31 +193,40 @@
                             </table>
                         </div>
                     </div>
+                    } @else {
+                    <div class="mb-8 p-4 bg-surface-container-high rounded-lg text-center">
+                        <mat-icon class="text-4xl text-on-surface-variant mb-2">inventory_2</mat-icon>
+                        <p class="text-on-surface-variant">Nessuna riga presente in questa fattura</p>
+                    </div>
+                    }
 
                     <!-- Totals -->
                     <div class="flex justify-end">
                         <div class="w-80 space-y-2">
                             <div class="flex justify-between text-on-surface">
                                 <span>Subtotale:</span>
-                                <span>€{{ inv.subtotal | number:'1.2-2' }}</span>
+                                <span>€{{ invoice()!.subtotal | number:'1.2-2' }}</span>
                             </div>
                             <div class="flex justify-between text-on-surface">
                                 <span>IVA:</span>
-                                <span>€{{ inv.tax_amount | number:'1.2-2' }}</span>
+                                <span>€{{ invoice()!.tax_amount | number:'1.2-2' }}</span>
                             </div>
                             <mat-divider class="my-2"></mat-divider>
                             <div class="flex justify-between text-lg font-bold text-on-surface">
                                 <span>Totale:</span>
-                                <span class="text-primary">€{{ inv.total | number:'1.2-2' }}</span>
+                                <span class="text-primary">€{{ invoice()!.total | number:'1.2-2' }}</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Notes -->
-                    @if (inv.notes) {
+                    @if (invoice()!.notes) {
                     <div class="mt-8 p-4 bg-surface-container-high rounded-lg">
-                        <h4 class="font-medium text-on-surface mb-2">Note:</h4>
-                        <p class="text-on-surface-variant">{{ inv.notes }}</p>
+                        <h4 class="font-medium text-on-surface mb-2 flex items-center gap-2">
+                            <mat-icon class="text-sm">note</mat-icon>
+                            Note:
+                        </h4>
+                        <p class="text-on-surface-variant">{{ invoice()!.notes }}</p>
                     </div>
                     }
                 </mat-card-content>
@@ -179,12 +244,12 @@
                     <div class="space-y-4">
                         <div class="flex items-center justify-between">
                             <span class="text-on-surface-variant">Stato attuale:</span>
-                            <mat-chip [class]="getStatusClass(inv.status)">
-                                {{ getStatusLabel(inv.status) }}
+                            <mat-chip [class]="getStatusClass(invoice()!.status)">
+                                {{ getStatusLabel(invoice()!.status) }}
                             </mat-chip>
                         </div>
 
-                        @if (inv.status === 'sent' && inv.due_date) {
+                        @if (invoice()!.status === 'sent' && invoice()!.due_date) {
                         <div class="flex items-center justify-between">
                             <span class="text-on-surface-variant">Giorni alla scadenza:</span>
                             <span [class]="getDaysToDeadlineClass()">
@@ -194,15 +259,25 @@
                         }
 
                         <div class="pt-4 space-y-2">
-                            @if (inv.status === 'draft') {
-                            <button mat-raised-button color="primary" class="w-full" (click)="markAsSent()">
+                            @if (invoice()!.status === 'draft') {
+                            <button mat-raised-button color="primary" class="w-full" (click)="markAsSent()"
+                                [disabled]="updating()">
+                                @if (updating()) {
+                                <mat-icon class="animate-spin">hourglass_empty</mat-icon>
+                                } @else {
                                 <mat-icon>send</mat-icon>
+                                }
                                 Segna come Inviata
                             </button>
                             }
-                            @if (inv.status === 'sent') {
-                            <button mat-raised-button color="primary" class="w-full" (click)="markAsPaid()">
+                            @if (invoice()!.status === 'sent') {
+                            <button mat-raised-button color="primary" class="w-full" (click)="markAsPaid()"
+                                [disabled]="updating()">
+                                @if (updating()) {
+                                <mat-icon class="animate-spin">hourglass_empty</mat-icon>
+                                } @else {
                                 <mat-icon>check_circle</mat-icon>
+                                }
                                 Segna come Pagata
                             </button>
                             }
@@ -220,16 +295,27 @@
                     <div class="space-y-3">
                         <div class="flex justify-between">
                             <span class="text-on-surface-variant">Righe:</span>
-                            <span class="text-on-surface">{{ inv.items.length }}</span>
+                            <span class="text-on-surface">{{ invoice()!.items.length || 0 }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-on-surface-variant">Cliente:</span>
-                            <span class="text-on-surface">{{ inv.customer?.name }}</span>
+                            <span class="text-on-surface">{{ invoice()!.customer?.name || 'Non specificato' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-on-surface-variant">Creata:</span>
-                            <span class="text-on-surface">{{ inv.created_at | date:'dd/MM/yy' }}</span>
+                            <span class="text-on-surface">{{ invoice()!.created_at | date:'dd/MM/yy' }}</span>
                         </div>
+                        @if (invoice()!.customer?.vat_number) {
+                        <div class="flex justify-between">
+                            <span class="text-on-surface-variant">Tipo cliente:</span>
+                            <span class="text-on-surface">Azienda</span>
+                        </div>
+                        } @else {
+                        <div class="flex justify-between">
+                            <span class="text-on-surface-variant">Tipo cliente:</span>
+                            <span class="text-on-surface">Privato</span>
+                        </div>
+                        }
                     </div>
                 </mat-card-content>
             </mat-card>
@@ -241,30 +327,79 @@
                 </mat-card-header>
                 <mat-card-content class="p-4">
                     <div class="space-y-2">
-                        <button mat-outlined-button class="w-full" (click)="downloadPDF()">
+                        <button mat-outlined-button class="w-full" (click)="downloadPDF()" [disabled]="updating()">
                             <mat-icon>picture_as_pdf</mat-icon>
                             Scarica PDF
                         </button>
-                        <button mat-outlined-button class="w-full" (click)="sendInvoice()">
+                        <button mat-outlined-button class="w-full" (click)="sendInvoice()" [disabled]="updating()">
                             <mat-icon>email</mat-icon>
                             Invia Email
                         </button>
-                        <button mat-outlined-button class="w-full" (click)="printInvoice()">
+                        <button mat-outlined-button class="w-full" (click)="printInvoice()" [disabled]="updating()">
                             <mat-icon>print</mat-icon>
                             Stampa
+                        </button>
+                        <button mat-outlined-button class="w-full" [routerLink]="['/invoices', invoice()!.id, 'edit']"
+                            [disabled]="updating()">
+                            <mat-icon>edit</mat-icon>
+                            Modifica
                         </button>
                     </div>
                 </mat-card-content>
             </mat-card>
+
+            <!-- Customer Quick Info -->
+            @if (invoice()!.customer) {
+            <mat-card class="surface-container">
+                <mat-card-header>
+                    <mat-card-title class="text-on-surface">Cliente</mat-card-title>
+                </mat-card-header>
+                <mat-card-content class="p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <mat-icon class="text-primary">
+                                {{ invoice()!.customer?.vat_number ? 'business' : 'person' }}
+                            </mat-icon>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-on-surface truncate">{{ invoice()!.customer?.name }}</p>
+                            @if (invoice()!.customer?.email) {
+                            <p class="text-sm text-on-surface-variant truncate">{{ invoice()!.customer?.email }}</p>
+                            }
+                        </div>
+                    </div>
+                    <button mat-outlined-button class="w-full" [routerLink]="['/customers']"
+                        [queryParams]="{customerId: invoice()!.customer?.id}" [disabled]="updating()">
+                        <mat-icon>visibility</mat-icon>
+                        Vedi altre fatture
+                    </button>
+                </mat-card-content>
+            </mat-card>
+            }
         </div>
     </div>
+
+    <!-- Updating Overlay -->
+    @if (updating()) {
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <mat-card class="p-6 text-center">
+            <mat-spinner diameter="40" class="mb-4 mx-auto"></mat-spinner>
+            <p class="text-on-surface">Aggiornamento in corso...</p>
+        </mat-card>
+    </div>
+    }
     } @else {
-    <!-- Loading State -->
-    <div class="flex justify-center items-center h-64">
-        <div class="text-center">
-            <div class="loading-shimmer w-16 h-16 rounded-lg mb-4 mx-auto"></div>
-            <p class="text-on-surface-variant">Caricamento fattura...</p>
-        </div>
+    <!-- Error State -->
+    <div class="text-center py-16">
+        <mat-icon class="text-8xl text-error mb-4">error_outline</mat-icon>
+        <h3 class="text-xl font-semibold text-on-surface mb-2">Fattura non trovata</h3>
+        <p class="text-on-surface-variant mb-6">
+            La fattura richiesta non esiste o non è accessibile.
+        </p>
+        <button mat-raised-button color="primary" (click)="goBack()">
+            <mat-icon>arrow_back</mat-icon>
+            Torna alle Fatture
+        </button>
     </div>
     }
 </div>
