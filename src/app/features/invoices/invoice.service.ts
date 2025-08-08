@@ -1,11 +1,13 @@
 import { inject, Injectable, signal } from '@angular/core';
 
-import { Observable, from, map, catchError, of, switchMap } from 'rxjs';
+import { Observable, from, map, catchError, of, switchMap, forkJoin } from 'rxjs';
 
 import { SupabaseService } from '../../../app/core/database/supabase.service';
 
 import { Customer } from '../customers/customer.model';
 import { Invoice } from './invoice.model';
+import { NotificationService } from '../../shared/services/notification.service';
+import { UtilityService } from '../../shared/services/utility.service';
 
 @Injectable({
     providedIn: 'root'
@@ -13,6 +15,8 @@ import { Invoice } from './invoice.model';
 export class InvoiceService {
 
     supabase = inject(SupabaseService);
+    notificationService = inject(NotificationService);
+    utilityService = inject(UtilityService);
 
     private invoicesSignal = signal<Invoice[]>([]);
     private customersSignal = signal<Customer[]>([]);
@@ -32,22 +36,68 @@ export class InvoiceService {
                 .from('invoices')
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .order('created_at', { ascending: false })
         ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                const invoices = (data || []).map(invoice => ({
-                    ...invoice,
-                    items: invoice.items || []
-                })) as Invoice[];
+            switchMap(({ data: invoicesData, error: invoicesError }) => {
+                if (invoicesError) throw invoicesError;
+
+                // Per ogni fattura, carica gli items separatamente
+                const invoicesWithItems$ = (invoicesData || []).map(invoice =>
+                    from(
+                        this.supabase.client
+                            .from('invoice_items')
+                            .select(`
+                                *,
+                                products(
+                                    id,
+                                    name,
+                                    description,
+                                    category,
+                                    unit
+                                )
+                            `)
+                            .eq('invoice_id', invoice.id)
+                            .order('created_at')
+                    ).pipe(
+                        map(({ data: itemsData, error: itemsError }) => {
+                            if (itemsError) {
+                                console.error(`Error loading items for invoice ${invoice.id}:`, itemsError);
+                                return { ...invoice, customer: invoice.customers, items: [] };
+                            }
+
+                            return {
+                                ...invoice,
+                                customer: invoice.customers,
+                                items: itemsData || []
+                            } as Invoice;
+                        })
+                    )
+                );
+
+                // Se non ci sono fatture, restituisci array vuoto
+                if (invoicesWithItems$.length === 0) {
+                    return of([]);
+                }
+
+                return forkJoin(invoicesWithItems$);
+            }),
+            map((invoices: Invoice[]) => {
                 this.invoicesSignal.set(invoices);
                 return invoices;
             }),
             catchError(error => {
                 console.error('Error loading invoices:', error);
+                this.notificationService.loadError('fatture', error);
                 return of([]);
             })
         );
@@ -59,28 +109,54 @@ export class InvoiceService {
                 .from('invoices')
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(
-                        *,
-                        product:products(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
                     )
                 `)
                 .eq('id', id)
                 .single()
         ).pipe(
-            map(({ data, error }) => {
-                if (error) {
-                    if (error.code === 'PGRST116') return null;
-                    throw error;
+            switchMap(({ data: invoiceData, error: invoiceError }) => {
+                if (invoiceError) {
+                    if (invoiceError.code === 'PGRST116') return of(null);
+                    throw invoiceError;
                 }
 
-                // Assicura che items sia sempre un array
-                const invoice = {
-                    ...data,
-                    items: data.items || []
-                } as Invoice;
+                // Carica gli items della fattura
+                return from(
+                    this.supabase.client
+                        .from('invoice_items')
+                        .select(`
+                            *,
+                            products(
+                                id,
+                                name,
+                                description,
+                                category,
+                                unit
+                            )
+                        `)
+                        .eq('invoice_id', id)
+                        .order('created_at')
+                ).pipe(
+                    map(({ data: itemsData, error: itemsError }) => {
+                        if (itemsError) {
+                            console.error(`Error loading items for invoice ${id}:`, itemsError);
+                        }
 
-                return invoice;
+                        return {
+                            ...invoiceData,
+                            customer: invoiceData.customers,
+                            items: itemsData || []
+                        } as Invoice;
+                    })
+                );
             }),
             catchError(error => {
                 console.error(`Error loading invoice with ID ${id}:`, error);
@@ -90,20 +166,23 @@ export class InvoiceService {
     }
 
     createInvoice(invoice: Omit<Invoice, 'id' | 'created_at'>): Observable<Invoice> {
+        // Prepara i dati per l'inserimento
+        const invoiceToInsert = {
+            invoice_number: invoice.invoice_number,
+            customer_id: invoice.customer_id,
+            issue_date: this.utilityService.formatDateForDB(invoice.issue_date),
+            due_date: invoice.due_date ? this.utilityService.formatDateForDB(invoice.due_date) : null,
+            subtotal: this.utilityService.roundToDecimals(invoice.subtotal),
+            tax_amount: this.utilityService.roundToDecimals(invoice.tax_amount),
+            total: this.utilityService.roundToDecimals(invoice.total),
+            status: invoice.status,
+            notes: this.utilityService.cleanString(invoice.notes)
+        };
+
         return from(
             this.supabase.client
                 .from('invoices')
-                .insert({
-                    invoice_number: invoice.invoice_number,
-                    customer_id: invoice.customer_id,
-                    issue_date: invoice.issue_date,
-                    due_date: invoice.due_date || null,
-                    subtotal: invoice.subtotal,
-                    tax_amount: invoice.tax_amount,
-                    total: invoice.total,
-                    status: invoice.status,
-                    notes: invoice.notes || null
-                })
+                .insert(invoiceToInsert)
                 .select()
                 .single()
         ).pipe(
@@ -114,12 +193,12 @@ export class InvoiceService {
                 if (invoice.items && invoice.items.length > 0) {
                     const itemsToInsert = invoice.items.map(item => ({
                         invoice_id: newInvoice.id,
-                        product_id: item.product_id || null, // Può essere null se è un item personalizzato
-                        description: item.description,
-                        quantity: item.quantity,
-                        unit_price: item.unit_price,
-                        tax_rate: item.tax_rate,
-                        total: item.total
+                        product_id: item.product_id || null,
+                        quantity: this.utilityService.roundToDecimals(item.quantity, 3),
+                        total: this.utilityService.roundToDecimals(item.total),
+                        description: item.description.trim(),
+                        unit_price: this.utilityService.roundToDecimals(item.unit_price),
+                        tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1)
                     }));
 
                     return from(
@@ -128,7 +207,13 @@ export class InvoiceService {
                             .insert(itemsToInsert)
                             .select(`
                                 *,
-                                product:products(*)
+                                products(
+                                    id,
+                                    name,
+                                    description,
+                                    category,
+                                    unit
+                                )
                             `)
                     ).pipe(
                         map(({ data: insertedItems, error: itemsError }) => {
@@ -138,6 +223,7 @@ export class InvoiceService {
 
                             return {
                                 ...newInvoice,
+                                customer: invoice.customer,
                                 items: insertedItems || []
                             } as Invoice;
                         })
@@ -146,33 +232,37 @@ export class InvoiceService {
                     this.loadInvoices();
                     return of({
                         ...newInvoice,
+                        customer: invoice.customer,
                         items: []
                     } as Invoice);
                 }
             }),
             catchError(error => {
                 console.error('Error creating invoice:', error);
+                this.notificationService.createError('fattura', error);
                 throw error;
             })
         );
     }
 
     updateInvoice(invoice: Invoice): Observable<Invoice> {
+        const invoiceToUpdate = {
+            invoice_number: invoice.invoice_number,
+            customer_id: invoice.customer_id,
+            issue_date: this.utilityService.formatDateForDB(invoice.issue_date),
+            due_date: invoice.due_date ? this.utilityService.formatDateForDB(invoice.due_date) : null,
+            subtotal: this.utilityService.roundToDecimals(invoice.subtotal),
+            tax_amount: this.utilityService.roundToDecimals(invoice.tax_amount),
+            total: this.utilityService.roundToDecimals(invoice.total),
+            status: invoice.status,
+            notes: this.utilityService.cleanString(invoice.notes),
+            updated_at: new Date().toISOString()
+        };
+
         return from(
             this.supabase.client
                 .from('invoices')
-                .update({
-                    invoice_number: invoice.invoice_number,
-                    customer_id: invoice.customer_id,
-                    issue_date: invoice.issue_date,
-                    due_date: invoice.due_date || null,
-                    subtotal: invoice.subtotal,
-                    tax_amount: invoice.tax_amount,
-                    total: invoice.total,
-                    status: invoice.status,
-                    notes: invoice.notes || null,
-                    updated_at: new Date().toISOString()
-                })
+                .update(invoiceToUpdate)
                 .eq('id', invoice.id)
                 .select()
                 .single()
@@ -193,11 +283,11 @@ export class InvoiceService {
                             const itemsToInsert = invoice.items.map(item => ({
                                 invoice_id: updatedInvoice.id,
                                 product_id: item.product_id || null,
-                                description: item.description,
-                                quantity: item.quantity,
-                                unit_price: item.unit_price,
-                                tax_rate: item.tax_rate,
-                                total: item.total
+                                quantity: this.utilityService.roundToDecimals(item.quantity, 3),
+                                total: this.utilityService.roundToDecimals(item.total),
+                                description: item.description.trim(),
+                                unit_price: this.utilityService.roundToDecimals(item.unit_price),
+                                tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1)
                             }));
 
                             return from(
@@ -206,7 +296,13 @@ export class InvoiceService {
                                     .insert(itemsToInsert)
                                     .select(`
                                         *,
-                                        product:products(*)
+                                        products(
+                                            id,
+                                            name,
+                                            description,
+                                            category,
+                                            unit
+                                        )
                                     `)
                             ).pipe(
                                 map(({ data: insertedItems, error: itemsError }) => {
@@ -216,6 +312,7 @@ export class InvoiceService {
 
                                     return {
                                         ...updatedInvoice,
+                                        customer: invoice.customer,
                                         items: insertedItems || []
                                     } as Invoice;
                                 })
@@ -224,6 +321,7 @@ export class InvoiceService {
                             this.loadInvoices();
                             return of({
                                 ...updatedInvoice,
+                                customer: invoice.customer,
                                 items: []
                             } as Invoice);
                         }
@@ -232,6 +330,7 @@ export class InvoiceService {
             }),
             catchError(error => {
                 console.error('Error updating invoice:', error);
+                this.notificationService.updateError('fattura', error);
                 throw error;
             })
         );
@@ -239,11 +338,21 @@ export class InvoiceService {
 
     deleteInvoice(id: string): Observable<void> {
         return from(
+            // Prima elimina gli items
             this.supabase.client
-                .from('invoices')
+                .from('invoice_items')
                 .delete()
-                .eq('id', id)
+                .eq('invoice_id', id)
         ).pipe(
+            switchMap(() =>
+                // Poi elimina la fattura
+                from(
+                    this.supabase.client
+                        .from('invoices')
+                        .delete()
+                        .eq('id', id)
+                )
+            ),
             map(({ error }) => {
                 if (error) throw error;
                 this.loadInvoices();
@@ -251,6 +360,7 @@ export class InvoiceService {
             }),
             catchError(error => {
                 console.error(`Error deleting invoice with ID ${id}:`, error);
+                this.notificationService.deleteError('fattura', error);
                 throw error;
             })
         );
@@ -270,46 +380,93 @@ export class InvoiceService {
                     ...invoiceData,
                     invoice_number: this.generateInvoiceNumber(),
                     status: 'draft',
-                    issue_date: new Date().toISOString().split('T')[0],
-                    due_date: '',
-                    items: sourceInvoice.items.map(({ id, invoice_id, ...item }) => ({
+                    issue_date: this.utilityService.getCurrentItalianDate().toISOString().split('T')[0],
+                    due_date: undefined,
+                    items: sourceInvoice.items.map(({ id, invoice_id, created_at, updated_at, ...item }) => ({
                         ...item,
                         product_id: item.product_id // Mantieni il riferimento al prodotto se presente
                     }))
                 };
 
                 return this.createInvoice(duplicatedInvoice);
+            }),
+            catchError(error => {
+                console.error('Error duplicating invoice:', error);
+                this.notificationService.error('Errore durante la duplicazione della fattura');
+                throw error;
             })
         );
     }
 
     // Cambia lo stato di una fattura
     updateInvoiceStatus(invoiceId: string, status: Invoice['status']): Observable<Invoice> {
+        const updateData: any = {
+            status,
+            updated_at: new Date().toISOString()
+        };
+
+        // Se lo stato diventa 'paid', aggiungi timestamp di pagamento
+        if (status === 'paid') {
+            updateData.paid_at = new Date().toISOString();
+        }
+
         return from(
             this.supabase.client
                 .from('invoices')
-                .update({
-                    status,
-                    updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', invoiceId)
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .single()
         ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                this.loadInvoices();
-                return {
-                    ...data,
-                    items: data.items || []
-                } as Invoice;
+            switchMap(({ data: updatedInvoice, error: invoiceError }) => {
+                if (invoiceError) throw invoiceError;
+
+                // Carica anche gli items
+                return from(
+                    this.supabase.client
+                        .from('invoice_items')
+                        .select(`
+                            *,
+                            products(
+                                id,
+                                name,
+                                description,
+                                category,
+                                unit
+                            )
+                        `)
+                        .eq('invoice_id', invoiceId)
+                        .order('created_at')
+                ).pipe(
+                    map(({ data: itemsData, error: itemsError }) => {
+                        if (itemsError) {
+                            console.error(`Error loading items for updated invoice ${invoiceId}:`, itemsError);
+                        }
+
+                        this.loadInvoices();
+
+                        return {
+                            ...updatedInvoice,
+                            customer: updatedInvoice.customers,
+                            items: itemsData || []
+                        } as Invoice;
+                    })
+                );
             }),
             catchError(error => {
                 console.error('Error updating invoice status:', error);
+                this.notificationService.updateError('stato fattura', error);
                 throw error;
             })
         );
@@ -322,18 +479,50 @@ export class InvoiceService {
                 .from('invoices')
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .eq('customer_id', customerId)
                 .order('created_at', { ascending: false })
         ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                return (data || []).map(invoice => ({
-                    ...invoice,
-                    items: invoice.items || []
-                })) as Invoice[];
+            switchMap(({ data: invoicesData, error: invoicesError }) => {
+                if (invoicesError) throw invoicesError;
+
+                if (!invoicesData || invoicesData.length === 0) {
+                    return of([]);
+                }
+
+                // Carica gli items per ogni fattura
+                const invoicesWithItems$ = invoicesData.map(invoice =>
+                    from(
+                        this.supabase.client
+                            .from('invoice_items')
+                            .select('*')
+                            .eq('invoice_id', invoice.id)
+                            .order('created_at')
+                    ).pipe(
+                        map(({ data: itemsData, error: itemsError }) => {
+                            if (itemsError) {
+                                console.error(`Error loading items for invoice ${invoice.id}:`, itemsError);
+                            }
+
+                            return {
+                                ...invoice,
+                                customer: invoice.customers,
+                                items: itemsData || []
+                            } as Invoice;
+                        })
+                    )
+                );
+
+                return forkJoin(invoicesWithItems$);
             }),
             catchError(error => {
                 console.error('Error loading invoices for customer:', error);
@@ -351,33 +540,46 @@ export class InvoiceService {
         overdue: number;
         totalRevenue: number;
         pendingRevenue: number;
+        thisMonthRevenue: number;
     }> {
         return this.getInvoices().pipe(
             map(invoices => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = new Date();
+                const currentMonth = today.getMonth();
+                const currentYear = today.getFullYear();
+
+                // Identifica fatture scadute
+                const overdueInvoices = invoices.filter(inv => {
+                    if (inv.status !== 'sent' || !inv.due_date) return false;
+                    return this.utilityService.isDateInPast(inv.due_date);
+                });
 
                 return {
                     total: invoices.length,
                     draft: invoices.filter(inv => inv.status === 'draft').length,
                     sent: invoices.filter(inv => inv.status === 'sent').length,
                     paid: invoices.filter(inv => inv.status === 'paid').length,
-                    overdue: invoices.filter(inv =>
-                        inv.status === 'sent' &&
-                        inv.due_date &&
-                        inv.due_date < today
-                    ).length,
+                    overdue: overdueInvoices.length,
                     totalRevenue: invoices
                         .filter(inv => inv.status === 'paid')
                         .reduce((sum, inv) => sum + inv.total, 0),
                     pendingRevenue: invoices
                         .filter(inv => inv.status === 'sent')
+                        .reduce((sum, inv) => sum + inv.total, 0),
+                    thisMonthRevenue: invoices
+                        .filter(inv => {
+                            const invoiceDate = new Date(inv.issue_date);
+                            return inv.status === 'paid' &&
+                                invoiceDate.getMonth() === currentMonth &&
+                                invoiceDate.getFullYear() === currentYear;
+                        })
                         .reduce((sum, inv) => sum + inv.total, 0)
                 };
             })
         );
     }
 
-    // CRUD Operazioni per Clienti
+    // CRUD Operazioni per Clienti (proxy al CustomerService)
     getCustomers(): Observable<Customer[]> {
         return from(
             this.supabase.client
@@ -392,83 +594,23 @@ export class InvoiceService {
             }),
             catchError(error => {
                 console.error('Error loading customers:', error);
+                this.notificationService.loadError('clienti', error);
                 return of([]);
-            })
-        );
-    }
-
-    createCustomer(customer: Omit<Customer, 'id' | 'created_at'>): Observable<Customer> {
-        return from(
-            this.supabase.client
-                .from('customers')
-                .insert(customer)
-                .select()
-                .single()
-        ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                this.loadCustomers();
-                return data;
-            }),
-            catchError(error => {
-                console.error('Error creating customer:', error);
-                throw error;
-            })
-        );
-    }
-
-    updateCustomer(customer: Customer): Observable<Customer> {
-        const { id, created_at, ...updateData } = customer;
-
-        return from(
-            this.supabase.client
-                .from('customers')
-                .update({
-                    ...updateData,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', id)
-                .select()
-                .single()
-        ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                this.loadCustomers();
-                return data;
-            }),
-            catchError(error => {
-                console.error('Error updating customer:', error);
-                throw error;
-            })
-        );
-    }
-
-    deleteCustomer(id: string): Observable<void> {
-        return from(
-            this.supabase.client
-                .from('customers')
-                .delete()
-                .eq('id', id)
-        ).pipe(
-            map(({ error }) => {
-                if (error) throw error;
-                this.loadCustomers();
-                return;
-            }),
-            catchError(error => {
-                console.error(`Error deleting customer with ID ${id}:`, error);
-                throw error;
             })
         );
     }
 
     // Ricerca clienti per autocomplete
     searchCustomers(searchTerm: string): Observable<Customer[]> {
+        if (!searchTerm || searchTerm.trim().length < 2) {
+            return of(this.customers().slice(0, 10)); // Limita risultati se ricerca vuota
+        }
+
         return from(
             this.supabase.client
                 .from('customers')
                 .select('*')
-                .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,vat_number.ilike.%${searchTerm}%`)
+                .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,vat_number.ilike.%${searchTerm}%,tax_code.ilike.%${searchTerm}%`)
                 .order('name')
                 .limit(20)
         ).pipe(
@@ -485,27 +627,58 @@ export class InvoiceService {
 
     // Ottieni le fatture scadute
     getOverdueInvoices(): Observable<Invoice[]> {
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.utilityService.formatDateForDB(new Date())!;
 
         return from(
             this.supabase.client
                 .from('invoices')
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .eq('status', 'sent')
                 .lt('due_date', today)
                 .not('due_date', 'is', null)
                 .order('due_date', { ascending: true })
         ).pipe(
-            map(({ data, error }) => {
-                if (error) throw error;
-                return (data || []).map(invoice => ({
-                    ...invoice,
-                    items: invoice.items || []
-                })) as Invoice[];
+            switchMap(({ data: invoicesData, error: invoicesError }) => {
+                if (invoicesError) throw invoicesError;
+
+                if (!invoicesData || invoicesData.length === 0) {
+                    return of([]);
+                }
+
+                // Carica gli items per ogni fattura scaduta
+                const invoicesWithItems$ = invoicesData.map(invoice =>
+                    from(
+                        this.supabase.client
+                            .from('invoice_items')
+                            .select('*')
+                            .eq('invoice_id', invoice.id)
+                    ).pipe(
+                        map(({ data: itemsData, error: itemsError }) => {
+                            if (itemsError) {
+                                console.error(`Error loading items for overdue invoice ${invoice.id}:`, itemsError);
+                            }
+
+                            return {
+                                ...invoice,
+                                customer: invoice.customers,
+                                items: itemsData || []
+                            } as Invoice;
+                        })
+                    )
+                );
+
+                return forkJoin(invoicesWithItems$);
             }),
             catchError(error => {
                 console.error('Error loading overdue invoices:', error);
@@ -521,8 +694,15 @@ export class InvoiceService {
                 .from('invoices')
                 .select(`
                     *,
-                    customer:customers(*),
-                    items:invoice_items(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .gte('issue_date', startDate)
                 .lte('issue_date', endDate)
@@ -532,49 +712,13 @@ export class InvoiceService {
                 if (error) throw error;
                 return (data || []).map(invoice => ({
                     ...invoice,
-                    items: invoice.items || []
+                    customer: invoice.customers,
+                    items: [] // Gli items verranno caricati solo se necessario per performance
                 })) as Invoice[];
             }),
             catchError(error => {
                 console.error('Error loading invoices by date range:', error);
                 return of([]);
-            })
-        );
-    }
-
-    // Aggiorna le date di scadenza automatiche
-    updateDueDatesAutomatically(invoiceId: string, paymentTerms: number = 30): Observable<Invoice> {
-        return this.getInvoiceById(invoiceId).pipe(
-            switchMap(invoice => {
-                if (!invoice) throw new Error('Fattura non trovata');
-
-                const issueDate = new Date(invoice.issue_date);
-                const dueDate = new Date(issueDate);
-                dueDate.setDate(issueDate.getDate() + paymentTerms);
-
-                return from(
-                    this.supabase.client
-                        .from('invoices')
-                        .update({
-                            due_date: dueDate.toISOString().split('T')[0],
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', invoiceId)
-                        .select(`
-                            *,
-                            customer:customers(*),
-                            items:invoice_items(*)
-                        `)
-                        .single()
-                ).pipe(
-                    map(({ data, error }) => {
-                        if (error) throw error;
-                        return {
-                            ...data,
-                            items: data.items || []
-                        } as Invoice;
-                    })
-                );
             })
         );
     }
@@ -625,7 +769,15 @@ export class InvoiceService {
                 .select(`
                     customer_id,
                     total,
-                    customer:customers(*)
+                    customers!invoices_customer_id_fkey(
+                        id,
+                        name,
+                        email,
+                        phone,
+                        address,
+                        tax_code,
+                        vat_number
+                    )
                 `)
                 .eq('status', 'paid')
         ).pipe(
@@ -639,18 +791,15 @@ export class InvoiceService {
                 }>();
 
                 (data || []).forEach((invoice: any) => {
-                    // Gestisce il caso in cui customer può essere un array o un oggetto
-                    const customerData = Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer;
+                    const customerData = invoice.customers;
 
                     if (customerData && invoice.customer_id) {
                         const existing = customerMap.get(invoice.customer_id);
 
                         if (existing) {
-                            // Aggiorna i valori esistenti
                             existing.totalRevenue += invoice.total || 0;
                             existing.invoiceCount += 1;
                         } else {
-                            // Crea nuova entry
                             customerMap.set(invoice.customer_id, {
                                 customer: customerData as Customer,
                                 totalRevenue: invoice.total || 0,
@@ -699,6 +848,7 @@ export class InvoiceService {
         invoices: Invoice[];
         customers: Customer[];
         exportDate: string;
+        version: string;
     }> {
         return this.getInvoices().pipe(
             switchMap(invoices => {
@@ -706,9 +856,140 @@ export class InvoiceService {
                     map(customers => ({
                         invoices,
                         customers,
-                        exportDate: new Date().toISOString()
+                        exportDate: new Date().toISOString(),
+                        version: this.utilityService.getAppVersion().version
                     }))
                 );
+            })
+        );
+    }
+
+    // Aggiorna automaticamente lo stato delle fatture scadute
+    updateOverdueInvoices(): Observable<number> {
+        const today = this.utilityService.formatDateForDB(new Date())!;
+
+        return from(
+            this.supabase.client
+                .from('invoices')
+                .update({
+                    status: 'overdue',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('status', 'sent')
+                .lt('due_date', today)
+                .not('due_date', 'is', null)
+                .select('id')
+        ).pipe(
+            map(({ data, error }) => {
+                if (error) throw error;
+
+                const updatedCount = data?.length || 0;
+                if (updatedCount > 0) {
+                    this.loadInvoices(); // Ricarica le fatture se ci sono stati aggiornamenti
+                }
+
+                return updatedCount;
+            }),
+            catchError(error => {
+                console.error('Error updating overdue invoices:', error);
+                return of(0);
+            })
+        );
+    }
+
+    // Calcola il prossimo numero di fattura suggerito
+    getNextInvoiceNumber(): Observable<string> {
+        const currentYear = new Date().getFullYear();
+
+        return from(
+            this.supabase.client
+                .from('invoices')
+                .select('invoice_number')
+                .like('invoice_number', `INV-${currentYear}-%`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+        ).pipe(
+            map(({ data, error }) => {
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    const lastNumber = data[0].invoice_number;
+                    // Estrai il numero sequenziale e incrementa
+                    const matches = lastNumber.match(/INV-(\d{4})-(\d+)/);
+                    if (matches) {
+                        const year = parseInt(matches[1]);
+                        const sequence = parseInt(matches[2]);
+
+                        if (year === currentYear) {
+                            return `INV-${currentYear}-${(sequence + 1).toString().padStart(6, '0')}`;
+                        }
+                    }
+                }
+
+                // Se non ci sono fatture per l'anno corrente, inizia da 000001
+                return `INV-${currentYear}-000001`;
+            }),
+            catchError(error => {
+                console.error('Error calculating next invoice number:', error);
+                // Fallback al metodo timestamp
+                return of(this.generateInvoiceNumber());
+            })
+        );
+    }
+
+    // Statistiche avanzate per dashboard
+    getDashboardMetrics(): Observable<{
+        totalInvoices: number;
+        totalRevenue: number;
+        averageInvoiceValue: number;
+        topCustomer: { name: string; revenue: number } | null;
+        recentActivity: { date: string; count: number }[];
+        statusDistribution: { status: string; count: number; percentage: number }[];
+    }> {
+        return this.getInvoices().pipe(
+            map(invoices => {
+                const totalRevenue = invoices
+                    .filter(inv => inv.status === 'paid')
+                    .reduce((sum, inv) => sum + inv.total, 0);
+
+                const averageInvoiceValue = invoices.length > 0 ? totalRevenue / invoices.length : 0;
+
+                // Calcola distribuzione stati
+                const statusMap = new Map<string, number>();
+                invoices.forEach(inv => {
+                    statusMap.set(inv.status, (statusMap.get(inv.status) || 0) + 1);
+                });
+
+                const statusDistribution = Array.from(statusMap.entries()).map(([status, count]) => ({
+                    status,
+                    count,
+                    percentage: (count / invoices.length) * 100
+                }));
+
+                // Attività recente (ultimi 7 giorni)
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                const recentActivity = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateStr = this.utilityService.formatDateForDB(date)!;
+
+                    const count = invoices.filter(inv =>
+                        inv.issue_date === dateStr
+                    ).length;
+
+                    return { date: dateStr, count };
+                }).reverse();
+
+                return {
+                    totalInvoices: invoices.length,
+                    totalRevenue,
+                    averageInvoiceValue,
+                    topCustomer: null, // Calcolato separatamente con getTopCustomersByRevenue
+                    recentActivity,
+                    statusDistribution
+                };
             })
         );
     }
@@ -724,6 +1005,70 @@ export class InvoiceService {
     generateInvoiceNumber(): string {
         const year = new Date().getFullYear();
         const timestamp = Date.now();
-        return `INV-${year}-${timestamp.toString().slice(-6)}`;
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        return `INV-${year}-${timestamp.toString().slice(-6)}${randomSuffix}`;
+    }
+
+    // Metodo per forzare il refresh dei dati
+    refreshData(): Observable<{ invoices: Invoice[]; customers: Customer[] }> {
+        return forkJoin({
+            invoices: this.getInvoices(),
+            customers: this.getCustomers()
+        });
+    }
+
+    // Metodo per verificare l'integrità dei dati
+    validateDataIntegrity(): Observable<{
+        valid: boolean;
+        issues: string[];
+        fixedIssues: number;
+    }> {
+        return this.getInvoices().pipe(
+            map(invoices => {
+                const issues: string[] = [];
+                let fixedIssues = 0;
+
+                invoices.forEach(invoice => {
+                    // Verifica che i totali siano corretti
+                    const calculatedSubtotal = invoice.items.reduce((sum, item) =>
+                        sum + (item.quantity * item.unit_price), 0);
+
+                    const calculatedTax = invoice.items.reduce((sum, item) =>
+                        sum + ((item.quantity * item.unit_price) * (item.tax_rate / 100)), 0);
+
+                    const calculatedTotal = calculatedSubtotal + calculatedTax;
+
+                    const subtotalDiff = Math.abs(invoice.subtotal - calculatedSubtotal);
+                    const taxDiff = Math.abs(invoice.tax_amount - calculatedTax);
+                    const totalDiff = Math.abs(invoice.total - calculatedTotal);
+
+                    if (subtotalDiff > 0.01) {
+                        issues.push(`Fattura ${invoice.invoice_number}: subtotale non corretto`);
+                    }
+                    if (taxDiff > 0.01) {
+                        issues.push(`Fattura ${invoice.invoice_number}: IVA non corretta`);
+                    }
+                    if (totalDiff > 0.01) {
+                        issues.push(`Fattura ${invoice.invoice_number}: totale non corretto`);
+                    }
+
+                    // Verifica che il cliente esista
+                    if (!invoice.customer) {
+                        issues.push(`Fattura ${invoice.invoice_number}: cliente mancante`);
+                    }
+
+                    // Verifica che ci siano items
+                    if (!invoice.items || invoice.items.length === 0) {
+                        issues.push(`Fattura ${invoice.invoice_number}: nessuna riga presente`);
+                    }
+                });
+
+                return {
+                    valid: issues.length === 0,
+                    issues,
+                    fixedIssues
+                };
+            })
+        );
     }
 }
