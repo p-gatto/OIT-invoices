@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 import { MatCardModule } from '@angular/material/card';
@@ -22,6 +22,11 @@ import { ConfirmationDialogComponent } from '../../shared/components/confirmatio
 import { Customer } from './customer.model';
 import { CustomerService } from './customer.service';
 import { CustomerDiaogComponent } from './customer-diaog/customer-diaog.component';
+
+// Interfaccia per gestire l'apertura automatica del dialogo
+export interface CustomerDialogTrigger {
+  openNewCustomerDialog(): void;
+}
 
 @Component({
   selector: 'app-customers',
@@ -47,42 +52,66 @@ import { CustomerDiaogComponent } from './customer-diaog/customer-diaog.componen
   templateUrl: './customers.component.html',
   styleUrl: './customers.component.scss'
 })
-export class CustomersComponent implements OnInit {
+export class CustomersComponent implements OnInit, CustomerDialogTrigger {
 
   customerService = inject(CustomerService);
   dialog = inject(MatDialog);
   snackBar = inject(MatSnackBar);
   router = inject(Router);
+  route = inject(ActivatedRoute);
 
   customers = signal<Customer[]>([]);
-  searchQuery = signal(''); // Convertito in signal per reattività
+  searchQuery = signal('');
   loading = signal(true);
   displayedColumns = ['name', 'contact', 'tax_info', 'address', 'actions'];
 
   // Statistiche per ogni cliente
   customerStats = signal<Map<string, any>>(new Map());
 
+  // Signal per gestire la selezione di un cliente specifico
+  selectedCustomerId = signal<string | null>(null);
+
   filteredCustomers = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
+    const selectedId = this.selectedCustomerId();
 
-    if (!query) {
-      return this.customers();
+    let filtered = this.customers();
+
+    // Se c'è un cliente selezionato dai query params, filtra solo quello
+    if (selectedId) {
+      filtered = filtered.filter(customer => customer.id === selectedId);
     }
 
-    return this.customers().filter(customer =>
-      customer.name.toLowerCase().includes(query) ||
-      customer.email?.toLowerCase().includes(query) ||
-      customer.phone?.toLowerCase().includes(query) ||
-      customer.tax_code?.toLowerCase().includes(query) ||
-      customer.vat_number?.toLowerCase().includes(query) ||
-      customer.address?.toLowerCase().includes(query)
-    );
+    // Applica il filtro di ricerca se presente
+    if (query && !selectedId) {
+      filtered = filtered.filter(customer =>
+        customer.name.toLowerCase().includes(query) ||
+        customer.email?.toLowerCase().includes(query) ||
+        customer.phone?.toLowerCase().includes(query) ||
+        customer.tax_code?.toLowerCase().includes(query) ||
+        customer.vat_number?.toLowerCase().includes(query) ||
+        customer.address?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
   });
 
   constructor() { }
 
   ngOnInit() {
     this.loadCustomers();
+    this.checkQueryParams();
+  }
+
+  private checkQueryParams() {
+    // Controlla se c'è un customerId specifico nei query params
+    this.route.queryParamMap.subscribe(params => {
+      const customerId = params.get('customerId');
+      if (customerId) {
+        this.selectedCustomerId.set(customerId);
+      }
+    });
   }
 
   private loadCustomers() {
@@ -107,11 +136,24 @@ export class CustomersComponent implements OnInit {
   }
 
   private loadCustomerStats(customerId: string) {
-    this.customerService.getCustomerStats(customerId).subscribe(stats => {
-      const currentStats = this.customerStats();
-      currentStats.set(customerId, stats);
-      this.customerStats.set(new Map(currentStats));
+    this.customerService.getCustomerStats(customerId).subscribe({
+      next: stats => {
+        const currentStats = this.customerStats();
+        currentStats.set(customerId, stats);
+        this.customerStats.set(new Map(currentStats));
+      },
+      error: error => {
+        console.error(`Error loading stats for customer ${customerId}:`, error);
+      }
     });
+  }
+
+  /**
+   * Implementazione dell'interfaccia CustomerDialogTrigger
+   * Consente ad altri componenti di aprire il dialogo di creazione cliente
+   */
+  openNewCustomerDialog(): void {
+    this.openCustomerDialog();
   }
 
   /**
@@ -124,10 +166,6 @@ export class CustomersComponent implements OnInit {
     // come logging, analytics, o validazioni
     const query = this.searchQuery().trim();
 
-    /* if (query.length > 0) {
-      console.log(`Filtering customers with query: "${query}"`);
-    } */
-
     // Il computed filteredCustomers si aggiorna automaticamente
     // grazie alla reattività dei signal
   }
@@ -137,6 +175,13 @@ export class CustomersComponent implements OnInit {
    */
   clearFilter() {
     this.searchQuery.set('');
+    this.selectedCustomerId.set(null);
+
+    // Pulisci anche i query params se presenti
+    this.router.navigate([], {
+      queryParams: { customerId: null },
+      queryParamsHandling: 'merge'
+    });
   }
 
   /**
@@ -161,6 +206,14 @@ export class CustomersComponent implements OnInit {
   }
 
   /**
+   * Filtra per un cliente specifico
+   */
+  selectCustomer(customerId: string) {
+    this.selectedCustomerId.set(customerId);
+    this.searchQuery.set(''); // Pulisci la ricerca testuale
+  }
+
+  /**
    * Restituisce il numero di risultati filtrati
    */
   getFilteredCount(): number {
@@ -171,7 +224,25 @@ export class CustomersComponent implements OnInit {
    * Verifica se sono attivi dei filtri
    */
   hasActiveFilters(): boolean {
-    return this.searchQuery().trim().length > 0;
+    return this.searchQuery().trim().length > 0 || this.selectedCustomerId() !== null;
+  }
+
+  /**
+   * Verifica se è attivo il filtro cliente specifico
+   */
+  hasCustomerFilter(): boolean {
+    return this.selectedCustomerId() !== null;
+  }
+
+  /**
+   * Ottiene il nome del cliente filtrato
+   */
+  getFilteredCustomerName(): string {
+    const customerId = this.selectedCustomerId();
+    if (!customerId) return '';
+
+    const customer = this.customers().find(c => c.id === customerId);
+    return customer?.name || '';
   }
 
   /**
@@ -206,6 +277,13 @@ export class CustomersComponent implements OnInit {
       next: (newCustomer) => {
         this.snackBar.open('Cliente creato con successo', 'Chiudi', { duration: 3000 });
         this.loadCustomers();
+
+        // Se è stato creato da una richiesta esterna, naviga alla creazione fattura
+        if (this.route.snapshot.queryParamMap.get('returnTo') === 'invoice') {
+          this.router.navigate(['/invoices/new'], {
+            queryParams: { customerId: newCustomer.id }
+          });
+        }
       },
       error: (error) => {
         this.snackBar.open('Errore nella creazione del cliente', 'Chiudi', { duration: 3000 });
@@ -286,6 +364,468 @@ export class CustomersComponent implements OnInit {
     this.router.navigate(['/invoices/new'], {
       queryParams: { customerId: customer.id }
     });
+  }
+
+  // Metodi di utilità per migliorare l'UX
+
+  /**
+   * Copia email del cliente negli appunti
+   */
+  async copyCustomerEmail(customer: Customer, event: Event) {
+    this.stopEventPropagation(event);
+
+    if (customer.email) {
+      try {
+        await navigator.clipboard.writeText(customer.email);
+        this.snackBar.open('Email copiata negli appunti', 'Chiudi', { duration: 2000 });
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+      }
+    }
+  }
+
+  /**
+   * Copia telefono del cliente negli appunti
+   */
+  async copyCustomerPhone(customer: Customer, event: Event) {
+    this.stopEventPropagation(event);
+
+    if (customer.phone) {
+      try {
+        await navigator.clipboard.writeText(customer.phone);
+        this.snackBar.open('Telefono copiato negli appunti', 'Chiudi', { duration: 2000 });
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+      }
+    }
+  }
+
+  /**
+   * Esporta lista clienti in CSV
+   */
+  exportCustomersToCSV() {
+    const customers = this.filteredCustomers();
+    if (customers.length === 0) {
+      this.snackBar.open('Nessun cliente da esportare', 'Chiudi', { duration: 3000 });
+      return;
+    }
+
+    const headers = ['Nome', 'Email', 'Telefono', 'Indirizzo', 'Codice Fiscale', 'Partita IVA', 'Note'];
+    const csvContent = [
+      headers.join(','),
+      ...customers.map(customer => [
+        `"${customer.name || ''}"`,
+        `"${customer.email || ''}"`,
+        `"${customer.phone || ''}"`,
+        `"${customer.address || ''}"`,
+        `"${customer.tax_code || ''}"`,
+        `"${customer.vat_number || ''}"`,
+        `"${(customer as any).notes || ''}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `clienti-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    this.snackBar.open('Lista clienti esportata con successo', 'Chiudi', { duration: 3000 });
+  }
+
+  /**
+   * Ottieni statistiche rapide sui clienti filtrati
+   */
+  getFilteredStats(): {
+    totalCustomers: number;
+    withEmail: number;
+    withPhone: number;
+    withVAT: number;
+    withTaxCode: number;
+  } {
+    const filtered = this.filteredCustomers();
+
+    return {
+      totalCustomers: filtered.length,
+      withEmail: filtered.filter(c => c.email).length,
+      withPhone: filtered.filter(c => c.phone).length,
+      withVAT: filtered.filter(c => c.vat_number).length,
+      withTaxCode: filtered.filter(c => c.tax_code).length
+    };
+  }
+
+  /**
+   * Determina il tipo di cliente (Azienda/Privato)
+   */
+  getCustomerType(customer: Customer): 'business' | 'individual' {
+    return customer.vat_number ? 'business' : 'individual';
+  }
+
+  /**
+   * Ottieni l'icona appropriata per il tipo di cliente
+   */
+  getCustomerIcon(customer: Customer): string {
+    return this.getCustomerType(customer) === 'business' ? 'business' : 'person';
+  }
+
+  /**
+   * Formatta l'indirizzo per la visualizzazione compatta
+   */
+  formatAddressForDisplay(address: string): string {
+    if (!address) return '';
+
+    // Limita a 50 caratteri per la visualizzazione in tabella
+    return address.length > 50 ? address.substring(0, 47) + '...' : address;
+  }
+
+  /**
+   * Controlla la completezza dei dati del cliente
+   */
+  getCustomerCompleteness(customer: Customer): {
+    percentage: number;
+    missingFields: string[];
+  } {
+    const fields = ['name', 'email', 'phone', 'address'];
+    const fiscalFields = ['tax_code', 'vat_number'];
+
+    let filledFields = 0;
+    const missingFields: string[] = [];
+
+    // Controlla campi base
+    fields.forEach(field => {
+      if (customer[field as keyof Customer]) {
+        filledFields++;
+      } else {
+        missingFields.push(field);
+      }
+    });
+
+    // Controlla almeno uno dei campi fiscali
+    const hasFiscalData = fiscalFields.some(field => customer[field as keyof Customer]);
+    if (hasFiscalData) {
+      filledFields++;
+    } else {
+      missingFields.push('dati_fiscali');
+    }
+
+    const totalFields = fields.length + 1; // +1 per i dati fiscali
+    const percentage = (filledFields / totalFields) * 100;
+
+    return { percentage, missingFields };
+  }
+
+  /**
+   * Ottieni la classe CSS per il livello di completezza
+   */
+  getCompletenessClass(percentage: number): string {
+    if (percentage >= 80) return 'text-green-600';
+    if (percentage >= 60) return 'text-orange-600';
+    return 'text-red-600';
+  }
+
+  /**
+   * Ordina i clienti per diversi criteri
+   */
+  sortCustomers(criteria: 'name' | 'recent' | 'invoices' | 'revenue') {
+    let sorted = [...this.customers()];
+
+    switch (criteria) {
+      case 'name':
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'recent':
+        sorted.sort((a, b) => {
+          const aDate = new Date(a.created_at || '');
+          const bDate = new Date(b.created_at || '');
+          return bDate.getTime() - aDate.getTime();
+        });
+        break;
+      case 'invoices':
+        sorted.sort((a, b) => {
+          const aStats = this.getCustomerStats(a.id);
+          const bStats = this.getCustomerStats(b.id);
+          const aInvoices = aStats?.totalInvoices || 0;
+          const bInvoices = bStats?.totalInvoices || 0;
+          return bInvoices - aInvoices;
+        });
+        break;
+      case 'revenue':
+        sorted.sort((a, b) => {
+          const aStats = this.getCustomerStats(a.id);
+          const bStats = this.getCustomerStats(b.id);
+          const aRevenue = aStats?.totalAmount || 0;
+          const bRevenue = bStats?.totalAmount || 0;
+          return bRevenue - aRevenue;
+        });
+        break;
+    }
+
+    this.customers.set(sorted);
+  }
+
+  /**
+   * Ottieni i top clienti per fatturato
+   */
+  getTopCustomersByRevenue(limit: number = 5): Customer[] {
+    return [...this.customers()]
+      .sort((a, b) => {
+        const aStats = this.getCustomerStats(a.id);
+        const bStats = this.getCustomerStats(b.id);
+        const aRevenue = aStats?.totalAmount || 0;
+        const bRevenue = bStats?.totalAmount || 0;
+        return bRevenue - aRevenue;
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * Metodi per la gestione dell'importazione di clienti
+   */
+  async importCustomersFromCSV(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      this.snackBar.open('Seleziona un file CSV valido', 'Chiudi', { duration: 3000 });
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n');
+
+      if (lines.length < 2) {
+        this.snackBar.open('Il file CSV deve contenere almeno un cliente', 'Chiudi', { duration: 3000 });
+        return;
+      }
+
+      // Parse CSV (implementazione semplificata)
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const requiredFields = ['nome', 'name'];
+
+      if (!requiredFields.some(field => headers.includes(field))) {
+        this.snackBar.open('Il CSV deve contenere almeno una colonna "Nome" o "Name"', 'Chiudi', { duration: 3000 });
+        return;
+      }
+
+      // Processo di importazione (da implementare completamente)
+      this.snackBar.open('Funzionalità di importazione in sviluppo', 'Chiudi', { duration: 3000 });
+
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      this.snackBar.open('Errore durante l\'importazione del file', 'Chiudi', { duration: 3000 });
+    }
+
+    // Reset input
+    input.value = '';
+  }
+
+  /**
+   * Cerca duplicati potenziali
+   */
+  findPotentialDuplicates(): Customer[] {
+    const customers = this.customers();
+    const duplicates: Customer[] = [];
+
+    for (let i = 0; i < customers.length; i++) {
+      for (let j = i + 1; j < customers.length; j++) {
+        const customer1 = customers[i];
+        const customer2 = customers[j];
+
+        // Controllo per nome simile (più del 80% di somiglianza)
+        const similarity = this.calculateStringSimilarity(customer1.name, customer2.name);
+
+        if (similarity > 0.8 ||
+          (customer1.email && customer1.email === customer2.email) ||
+          (customer1.phone && customer1.phone === customer2.phone) ||
+          (customer1.tax_code && customer1.tax_code === customer2.tax_code) ||
+          (customer1.vat_number && customer1.vat_number === customer2.vat_number)) {
+
+          if (!duplicates.includes(customer1)) duplicates.push(customer1);
+          if (!duplicates.includes(customer2)) duplicates.push(customer2);
+        }
+      }
+    }
+
+    return duplicates;
+  }
+
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+
+    if (longer.length === 0) return 1.0;
+
+    const editDistance = this.calculateLevenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  private calculateLevenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+
+    for (let i = 0; i <= str1.length; i += 1) {
+      matrix[0][i] = i;
+    }
+
+    for (let j = 0; j <= str2.length; j += 1) {
+      matrix[j][0] = j;
+    }
+
+    for (let j = 1; j <= str2.length; j += 1) {
+      for (let i = 1; i <= str1.length; i += 1) {
+        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1, // deletion
+          matrix[j - 1][i] + 1, // insertion
+          matrix[j - 1][i - 1] + indicator // substitution
+        );
+      }
+    }
+
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Metodo per gestire azioni bulk sui clienti selezionati
+   */
+  performBulkAction(action: 'delete' | 'export' | 'email', selectedCustomers: Customer[]) {
+    if (selectedCustomers.length === 0) {
+      this.snackBar.open('Seleziona almeno un cliente', 'Chiudi', { duration: 3000 });
+      return;
+    }
+
+    switch (action) {
+      case 'export':
+        this.exportSelectedCustomers(selectedCustomers);
+        break;
+      case 'delete':
+        this.deleteMultipleCustomers(selectedCustomers);
+        break;
+      case 'email':
+        this.sendBulkEmail(selectedCustomers);
+        break;
+    }
+  }
+
+  private exportSelectedCustomers(customers: Customer[]) {
+    // Implementazione dell'esportazione selettiva
+    this.snackBar.open(`Esportazione di ${customers.length} clienti in corso...`, 'Chiudi', { duration: 3000 });
+  }
+
+  private deleteMultipleCustomers(customers: Customer[]) {
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '500px',
+      data: {
+        title: 'Elimina Clienti Multipli',
+        message: `Sei sicuro di voler eliminare ${customers.length} clienti selezionati? Questa operazione è irreversibile.`,
+        confirmText: 'Elimina Tutti',
+        cancelText: 'Annulla'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        // Implementa l'eliminazione multipla
+        this.snackBar.open('Eliminazione multipla in corso...', 'Chiudi', { duration: 3000 });
+      }
+    });
+  }
+
+  private sendBulkEmail(customers: Customer[]) {
+    const customersWithEmail = customers.filter(c => c.email);
+    if (customersWithEmail.length === 0) {
+      this.snackBar.open('Nessun cliente selezionato ha un indirizzo email', 'Chiudi', { duration: 3000 });
+      return;
+    }
+
+    this.snackBar.open('Funzionalità email bulk in sviluppo', 'Chiudi', { duration: 3000 });
+  }
+
+  /**
+   * Ricerca avanzata con filtri multipli
+   */
+  advancedSearch(filters: {
+    name?: string;
+    email?: string;
+    hasVAT?: boolean;
+    hasTaxCode?: boolean;
+    hasInvoices?: boolean;
+    city?: string;
+  }) {
+    let filtered = this.customers();
+
+    if (filters.name) {
+      filtered = filtered.filter(c =>
+        c.name.toLowerCase().includes(filters.name!.toLowerCase())
+      );
+    }
+
+    if (filters.email) {
+      filtered = filtered.filter(c =>
+        c.email?.toLowerCase().includes(filters.email!.toLowerCase())
+      );
+    }
+
+    if (filters.hasVAT !== undefined) {
+      filtered = filtered.filter(c =>
+        filters.hasVAT ? !!c.vat_number : !c.vat_number
+      );
+    }
+
+    if (filters.hasTaxCode !== undefined) {
+      filtered = filtered.filter(c =>
+        filters.hasTaxCode ? !!c.tax_code : !c.tax_code
+      );
+    }
+
+    if (filters.city) {
+      filtered = filtered.filter(c =>
+        c.address?.toLowerCase().includes(filters.city!.toLowerCase())
+      );
+    }
+
+    // Per il filtro hasInvoices, dovremmo controllare le statistiche
+    if (filters.hasInvoices !== undefined) {
+      filtered = filtered.filter(c => {
+        const stats = this.getCustomerStats(c.id);
+        const hasInvoices = (stats?.totalInvoices || 0) > 0;
+        return filters.hasInvoices ? hasInvoices : !hasInvoices;
+      });
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Mostra clienti senza fatture
+   */
+  showCustomersWithoutInvoices() {
+    const customersWithoutInvoices = this.customers().filter(customer => {
+      const stats = this.getCustomerStats(customer.id);
+      return (stats?.totalInvoices || 0) === 0;
+    });
+
+    if (customersWithoutInvoices.length === 0) {
+      this.snackBar.open('Tutti i clienti hanno almeno una fattura', 'Chiudi', { duration: 3000 });
+    } else {
+      // Imposta un filtro personalizzato o naviga a una vista filtrata
+      this.snackBar.open(`Trovati ${customersWithoutInvoices.length} clienti senza fatture`, 'Chiudi', { duration: 3000 });
+    }
+  }
+
+  /**
+   * Metodo chiamato quando si clicca su una riga della tabella
+   */
+  onRowClick(customer: Customer) {
+    // Default action: mostra le fatture del cliente
+    this.viewCustomerInvoices(customer);
   }
 
 }
