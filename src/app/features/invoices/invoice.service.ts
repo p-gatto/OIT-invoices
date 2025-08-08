@@ -271,7 +271,7 @@ export class InvoiceService {
                     invoice_number: this.generateInvoiceNumber(),
                     status: 'draft',
                     issue_date: new Date().toISOString().split('T')[0],
-                    due_date: null,
+                    due_date: '',
                     items: sourceInvoice.items.map(({ id, invoice_id, ...item }) => ({
                         ...item,
                         product_id: item.product_id // Mantieni il riferimento al prodotto se presente
