@@ -1,170 +1,364 @@
-.sidebar-content {
-    width: 100%;
-    /* Riempie completamente il mat-sidenav */
-    height: 100%;
-    background-color: var(--mat-sys-surface-container);
-    /* Rimuovo min-width e max-width per adattarsi al contenitore */
+/* Indicatore lampeggiante per fatture scadute */
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
-.menu-item {
-    margin-bottom: 4px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-    padding: 8px 12px;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    width: 100%;
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.menu-item:hover {
-    background-color: var(--mat-sys-surface-container-high);
+/* Indicatore specifico per prodotti a basso stock */
+.product-low-stock-indicator {
+    background-color: #ff9800 !important;
+    /* Orange */
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
 }
 
-.active-menu-item {
-    background-color: var(--mat-sys-secondary-container);
-    color: var(--mat-sys-on-secondary-container);
+/* Indicatore specifico per fatture scadute */
+.invoice-overdue-indicator {
+    background-color: #f44336 !important;
+    /* Red */
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3);
 }
 
-.active-menu-item .menu-icon {
-    color: var(--mat-sys-on-secondary-container);
+/* Indicatore specifico per prodotti a basso stock */
+.product-low-stock-indicator {
+    background-color: #ff9800 !important;
+    /* Orange */
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
 }
 
-.menu-icon {
-    color: var(--mat-sys-on-surface-variant);
-    margin-right: 12px;
-    min-width: 24px;
-    flex-shrink: 0;
-}
+/* Indicatore specifico per fatture scadute */
+.invoice-overdue-indicator {
+    background-color: #f44336 !important;
+    /* Red */
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3);
 
-.menu-label {
-    color: var(--mat-sys-on-surface);
-    font-weight: 500;
-    font-size: 14px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-grow: 1;
-}
+    .sidebar-content {
+        width: 100%;
+        height: 100%;
+        background-color: var(--mat-sys-surface-container);
+    }
 
-.badge {
-    background-color: var(--mat-sys-error);
-    color: var(--mat-sys-on-error);
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 12px;
-    min-width: 20px;
-    text-align: center;
-    margin-left: auto;
-    font-weight: 600;
-    flex-shrink: 0;
-}
+    .menu-item {
+        margin-bottom: 4px;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        padding: 8px 12px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        position: relative;
+        /* Per il posizionamento degli indicatori */
 
-mat-nav-list {
-    padding: 0;
-    width: 100%;
-}
+        &:hover {
+            background-color: var(--mat-sys-surface-container-high);
+            transform: translateX(2px);
+        }
+    }
 
-mat-list-item {
-    height: auto;
-    min-height: 48px;
-    padding: 0 !important;
-    width: 100%;
-}
+    .active-menu-item {
+        background-color: var(--mat-sys-secondary-container);
+        color: var(--mat-sys-on-secondary-container);
 
-/* Override per i componenti Angular Material specifici */
-.mat-mdc-list-item {
-    padding: 0 !important;
-    width: 100% !important;
-}
+        .menu-icon {
+            color: var(--mat-sys-on-secondary-container);
+        }
+    }
 
-.mat-mdc-list-item .mdc-list-item__content {
-    padding: 0 !important;
-    width: 100% !important;
-}
+    .menu-icon {
+        color: var(--mat-sys-on-surface-variant);
+        margin-right: 12px;
+        min-width: 24px;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
 
-/* Sezione header della sidebar */
-.sidebar-content>div:first-child {
-    padding: 16px;
-}
+    .menu-label {
+        color: var(--mat-sys-on-surface);
+        font-weight: 500;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-grow: 1;
+    }
 
-.sidebar-content>div:first-child h2 {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-    line-height: 1.2;
-}
+    /* Badge Base Styles */
+    .badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+        margin-left: auto;
+        font-weight: 600;
+        flex-shrink: 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
 
-.sidebar-content>div:first-child p {
-    font-size: 11px;
-    margin: 2px 0 0 0;
-    opacity: 0.8;
-}
+        &:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
 
-/* Logo/Icon container */
-.sidebar-content .w-10.h-10 {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    flex-shrink: 0;
-}
+        &:active {
+            transform: scale(0.95);
+        }
+    }
 
-/* Navigation container */
-nav {
-    padding: 0 8px;
-}
+    /* Badge Variant Classes */
+    .badge-urgent {
+        background-color: var(--mat-sys-error);
+        color: var(--mat-sys-on-error);
+        animation: pulse-red 2s infinite;
 
-/* Sezione impostazioni */
-nav+mat-divider+div {
-    padding: 0 8px;
-}
+        &:hover {
+            background-color: var(--mat-sys-error-container);
+            color: var(--mat-sys-on-error-container);
+            border-color: var(--mat-sys-error);
+        }
+    }
 
-nav+mat-divider+div h3 {
-    padding: 8px 12px 4px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+    .badge-warning {
+        background-color: #ff9800; // Orange
+        color: white;
 
-/* Footer della sidebar */
-.sidebar-content>div:last-child {
-    padding: 16px;
-    border-top: 1px solid var(--mat-sys-outline-variant);
-    margin-top: auto;
-}
+        &:hover {
+            background-color: #f57c00;
+            border-color: #ff9800;
+        }
+    }
 
-.sidebar-content>div:last-child div {
-    font-size: 11px;
-    opacity: 0.7;
-}
+    .badge-info {
+        background-color: var(--mat-sys-primary);
+        color: var(--mat-sys-on-primary);
 
-/* Miglioramenti per l'accessibilità */
-.menu-item:focus-visible {
-    outline: 2px solid var(--mat-sys-primary);
-    outline-offset: 2px;
-}
+        &:hover {
+            background-color: var(--mat-sys-primary-container);
+            color: var(--mat-sys-on-primary-container);
+            border-color: var(--mat-sys-primary);
+        }
+    }
 
-/* Hover states migliorati */
-.menu-item:hover .menu-icon {
-    color: var(--mat-sys-on-surface);
-    transform: translateX(2px);
-    transition: all 0.2s ease;
-}
+    .badge-success {
+        background-color: #4caf50; // Green
+        color: white;
 
-.menu-item:hover .badge {
-    transform: scale(1.05);
-    transition: transform 0.2s ease;
-}
+        &:hover {
+            background-color: #388e3c;
+            border-color: #4caf50;
+        }
+    }
 
-.text-primary {
-    color: var(--mat-sys-primary);
-}
+    /* Animazioni per i badge urgenti */
+    @keyframes pulse-red {
 
-.text-on-primary {
-    color: var(--mat-sys-on-primary);
-}
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
 
-.bg-primary {
-    background-color: var(--mat-sys-primary);
+        50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+    }
+
+    /* Indicatore lampeggiante per fatture scadute */
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Miglioramenti per l'hover delle voci di menu */
+    .menu-item:hover {
+        .menu-icon {
+            color: var(--mat-sys-on-surface);
+            transform: translateX(2px);
+        }
+
+        .badge {
+            transform: scale(1.05);
+        }
+    }
+
+    /* Stili per le statistiche nel footer */
+    .sidebar-content>div:last-child {
+        padding: 16px;
+        border-top: 1px solid var(--mat-sys-outline-variant);
+        margin-top: auto;
+
+        .mini-stats {
+            margin-bottom: 12px;
+
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 4px;
+                font-size: 11px;
+
+                .stat-value {
+                    font-weight: 600;
+                    padding: 1px 4px;
+                    border-radius: 4px;
+
+                    &.text-orange-600 {
+                        background-color: rgba(251, 146, 60, 0.1);
+                    }
+
+                    &.text-red-600 {
+                        background-color: rgba(239, 68, 68, 0.1);
+                    }
+
+                    &.text-green-600 {
+                        background-color: rgba(34, 197, 94, 0.1);
+                    }
+                }
+            }
+
+            /* Stile per l'avviso basso stock */
+            .low-stock-alert {
+                background-color: rgba(255, 152, 0, 0.1);
+                border: 1px solid rgba(255, 152, 0, 0.3);
+                padding: 4px 6px;
+                border-radius: 6px;
+                margin-top: 4px;
+
+                &:hover {
+                    background-color: rgba(255, 152, 0, 0.2);
+                    cursor: pointer;
+                    transform: translateY(-1px);
+                    transition: all 0.2s ease;
+                }
+            }
+        }
+
+        div:last-child {
+            font-size: 11px;
+            opacity: 0.7;
+            text-align: center;
+        }
+    }
+
+    /* Override specifici per Material Design */
+    mat-nav-list {
+        padding: 0;
+        width: 100%;
+    }
+
+    mat-list-item {
+        height: auto;
+        min-height: 48px;
+        padding: 0 !important;
+        width: 100%;
+    }
+
+    .mat-mdc-list-item {
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .mat-mdc-list-item .mdc-list-item__content {
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Responsività */
+    @media (max-width: 768px) {
+        .sidebar-content {
+            min-width: 250px;
+        }
+
+        .menu-item {
+            padding: 10px 14px;
+            min-height: 52px;
+        }
+
+        .menu-label {
+            font-size: 15px;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 3px 7px;
+            min-width: 20px;
+        }
+    }
+
+    /* Stato di caricamento per i badge */
+    .badge-loading {
+        background: linear-gradient(90deg,
+                var(--mat-sys-surface-container) 25%,
+                var(--mat-sys-surface-container-high) 50%,
+                var(--mat-sys-surface-container) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        width: 20px;
+        height: 18px;
+        border-radius: 10px;
+    }
+
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+
+        100% {
+            background-position: 200% 0;
+        }
+    }
+
+    /* Accessibilità migliorata */
+    .menu-item:focus-visible {
+        outline: 2px solid var(--mat-sys-primary);
+        outline-offset: 2px;
+    }
+
+    .badge:focus-visible {
+        outline: 2px solid var(--mat-sys-primary);
+        outline-offset: 1px;
+    }
+
+    /* Stili per tema scuro */
+    @media (prefers-color-scheme: dark) {
+        .badge-warning {
+            background-color: #ff6f00;
+
+            &:hover {
+                background-color: #e65100;
+            }
+        }
+
+        .badge-success {
+            background-color: #2e7d32;
+
+            &:hover {
+                background-color: #1b5e20;
+            }
+        }
+    }
 }

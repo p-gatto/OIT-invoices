@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 
-import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, from, map, Observable, of, switchMap } from 'rxjs';
 
 import { SupabaseService } from '../../core/database/supabase.service';
 import { Product, ProductCategory } from './product.model';
@@ -399,27 +399,6 @@ export class ProductService {
   }
 
   /**
-   * Verifica se un prodotto è utilizzato in fatture
-   */
-  isProductUsedInInvoices(productId: string): Observable<boolean> {
-    return from(
-      this.supabase.client
-        .from('invoice_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('product_id', productId)
-    ).pipe(
-      map(({ count, error }) => {
-        if (error) throw error;
-        return (count || 0) > 0;
-      }),
-      catchError(error => {
-        console.error('Error checking product usage:', error);
-        return of(false);
-      })
-    );
-  }
-
-  /**
    * Crea template rapidi per prodotti/servizi comuni
    */
   createQuickTemplates(): Observable<Product[]> {
@@ -492,4 +471,390 @@ export class ProductService {
   private loadProducts() {
     this.getProducts().subscribe();
   }
+
+  // Aggiungi questo al metodo loadProducts esistente per cache le statistiche
+  private loadProductsStats() {
+    this.getProductCountsForSidebar().subscribe({
+      next: (stats) => {
+        // Potresti salvare queste statistiche in un signal per uso rapido
+        console.log('Product stats loaded:', stats);
+      },
+      error: (error) => {
+        console.error('Error loading product stats:', error);
+      }
+    });
+  }
+
+  /**
+   * Ottieni prodotti con statistiche di utilizzo
+   */
+  getProductsWithUsageStats(): Observable<Array<{
+    product: Product;
+    usageCount: number;
+    lastUsed: string | null;
+    isPopular: boolean;
+  }>> {
+    // Prima ottieni tutti i prodotti
+    return this.getProducts().pipe(
+      switchMap(products => {
+        // Poi ottieni tutte le righe fattura per calcolare l'utilizzo
+        return from(
+          this.supabase.client
+            .from('invoice_items')
+            .select('product_id, created_at')
+            .not('product_id', 'is', null)
+            .order('created_at', { ascending: false })
+        ).pipe(
+          map(({ data: items, error }) => {
+            if (error) throw error;
+
+            // Raggruppa manualmente per product_id
+            const usageMap = new Map<string, { count: number; lastUsed: string | null }>();
+
+            (items || []).forEach((item: any) => {
+              const productId = item.product_id;
+              const existing = usageMap.get(productId);
+
+              if (existing) {
+                existing.count++;
+                // Mantieni la data più recente
+                if (!existing.lastUsed || item.created_at > existing.lastUsed) {
+                  existing.lastUsed = item.created_at;
+                }
+              } else {
+                usageMap.set(productId, {
+                  count: 1,
+                  lastUsed: item.created_at
+                });
+              }
+            });
+
+            // Combina con i dati dei prodotti
+            return products
+              .map(product => {
+                const usage = usageMap.get(product.id!) || { count: 0, lastUsed: null };
+                return {
+                  product,
+                  usageCount: usage.count,
+                  lastUsed: usage.lastUsed,
+                  isPopular: usage.count > 5
+                };
+              })
+              .sort((a, b) => b.usageCount - a.usageCount); // Ordina per utilizzo
+          })
+        );
+      }),
+      catchError(error => {
+        console.error('Error loading products with usage stats:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Metodo semplificato per ottenere i prodotti più utilizzati
+   */
+  getMostUsedProductsSimple(limit: number = 5): Observable<Product[]> {
+    return from(
+      this.supabase.client
+        .from('invoice_items')
+        .select('product_id')
+        .not('product_id', 'is', null)
+    ).pipe(
+      switchMap(({ data: items, error }) => {
+        if (error) throw error;
+
+        // Conta manualmente l'utilizzo
+        const usageCount = new Map<string, number>();
+        (items || []).forEach((item: any) => {
+          const productId = item.product_id;
+          usageCount.set(productId, (usageCount.get(productId) || 0) + 1);
+        });
+
+        // Ordina per utilizzo e prendi i primi
+        const topProductIds = Array.from(usageCount.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, limit)
+          .map(([productId]) => productId);
+
+        if (topProductIds.length === 0) {
+          return of([]);
+        }
+
+        // Ottieni i dettagli dei prodotti più utilizzati
+        return from(
+          this.supabase.client
+            .from('products')
+            .select('*')
+            .in('id', topProductIds)
+            .eq('is_active', true)
+        ).pipe(
+          map(({ data: products, error: productsError }) => {
+            if (productsError) throw productsError;
+
+            // Riordina secondo l'ordine di utilizzo
+            const productMap = new Map((products || []).map(p => [p.id, p]));
+            return topProductIds
+              .map(id => productMap.get(id))
+              .filter(Boolean) as Product[];
+          })
+        );
+      }),
+      catchError(error => {
+        console.error('Error loading most used products:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Ottieni prodotti mai utilizzati (versione semplificata)
+   */
+  getUnusedProducts(): Observable<Product[]> {
+    return this.getProducts().pipe(
+      switchMap(products => {
+        if (products.length === 0) return of([]);
+
+        return from(
+          this.supabase.client
+            .from('invoice_items')
+            .select('product_id')
+            .not('product_id', 'is', null)
+            .in('product_id', products.map(p => p.id!))
+        ).pipe(
+          map(({ data: usedItems, error }) => {
+            if (error) {
+              console.error('Error checking product usage:', error);
+              return [];
+            }
+
+            const usedProductIds = new Set(
+              (usedItems || []).map((item: any) => item.product_id)
+            );
+
+            return products.filter(product => !usedProductIds.has(product.id));
+          })
+        );
+      }),
+      catchError(error => {
+        console.error('Error finding unused products:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Conta quante volte un prodotto è stato utilizzato
+   */
+  getProductUsageCount(productId: string): Observable<number> {
+    return from(
+      this.supabase.client
+        .from('invoice_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_id', productId)
+    ).pipe(
+      map(({ count, error }) => {
+        if (error) throw error;
+        return count || 0;
+      }),
+      catchError(error => {
+        console.error(`Error getting usage count for product ${productId}:`, error);
+        return of(0);
+      })
+    );
+
+
+  }
+
+
+  getProductStats(): Observable<{
+    total: number;
+    active: number;
+    inactive: number;
+    lowStock: number;
+    recentlyAdded: number;
+    hasUsageData: boolean;
+  }> {
+    return this.getAllProducts().pipe(
+      map(products => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const stats = {
+          total: products.length,
+          active: products.filter(p => p.is_active).length,
+          inactive: products.filter(p => !p.is_active).length,
+          lowStock: products.filter(p => p.is_active && p.unit_price < 10).length,
+          recentlyAdded: products.filter(p =>
+            p.created_at && new Date(p.created_at) > thirtyDaysAgo
+          ).length,
+          hasUsageData: true // Sempre true per ora
+        };
+
+        return stats;
+      }),
+      catchError(error => {
+        console.error('Error loading product stats:', error);
+        return of({
+          total: 0,
+          active: 0,
+          inactive: 0,
+          lowStock: 0,
+          recentlyAdded: 0,
+          hasUsageData: false
+        });
+      })
+    );
+  }
+
+  /**
+   * Metodo ottimizzato per la sidebar (semplificato)
+   */
+  getProductCountsForSidebar(): Observable<{
+    active: number;
+    total: number;
+    lowStock: number;
+    needsAttention: number;
+  }> {
+    return forkJoin({
+      allProducts: this.getAllProducts(),
+      activeProducts: this.getProducts()
+    }).pipe(
+      map(({ allProducts, activeProducts }) => {
+        // Simula basso stock per prodotti con prezzo < 10€
+        const lowStock = allProducts.filter(p =>
+          p.is_active && p.unit_price < 10
+        ).length;
+
+        // Prodotti che necessitano attenzione
+        const needsAttention = allProducts.filter(p =>
+          !p.is_active || p.unit_price <= 0 || p.unit_price > 1000
+        ).length;
+
+        return {
+          active: activeProducts.length,
+          total: allProducts.length,
+          lowStock,
+          needsAttention
+        };
+      }),
+      catchError(error => {
+        console.error('Error loading product counts for sidebar:', error);
+        return of({
+          active: 0,
+          total: 0,
+          lowStock: 0,
+          needsAttention: 0
+        });
+      })
+    );
+  }
+
+  /**
+   * Verifica se un prodotto è utilizzato (semplificato)
+   */
+  isProductUsedInInvoices(productId: string): Observable<boolean> {
+    return from(
+      this.supabase.client
+        .from('invoice_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_id', productId)
+    ).pipe(
+      map(({ count, error }) => {
+        if (error) throw error;
+        return (count || 0) > 0;
+      }),
+      catchError(error => {
+        console.error('Error checking product usage:', error);
+        return of(false);
+      })
+    );
+  }
+
+  /**
+   * Ottieni prodotti che necessitano attenzione (semplificato)
+   */
+  getProductsRequiringAttention(): Observable<{
+    lowStock: Product[];
+    inactive: Product[];
+    recentlyAdded: Product[];
+    priceAlerts: Product[];
+  }> {
+    return this.getAllProducts().pipe(
+      map(products => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        return {
+          lowStock: products.filter(p =>
+            p.is_active && p.unit_price < 10
+          ),
+          inactive: products.filter(p => !p.is_active),
+          recentlyAdded: products.filter(p =>
+            p.created_at && new Date(p.created_at) > thirtyDaysAgo
+          ),
+          priceAlerts: products.filter(p =>
+            p.is_active && (p.unit_price <= 0 || p.unit_price > 1000)
+          )
+        };
+      }),
+      catchError(error => {
+        console.error('Error loading products requiring attention:', error);
+        return of({
+          lowStock: [],
+          inactive: [],
+          recentlyAdded: [],
+          priceAlerts: []
+        });
+      })
+    );
+  }
+
+  /**
+   * Conta i prodotti utilizzati nelle fatture (asincrono ma semplice)
+   */
+  async getUsedProductsCount(): Promise<number> {
+    try {
+      const { data, error } = await this.supabase.client
+        .from('invoice_items')
+        .select('product_id')
+        .not('product_id', 'is', null);
+
+      if (error) throw error;
+
+      // Conta prodotti unici
+      const uniqueProducts = new Set((data || []).map(item => item.product_id));
+      return uniqueProducts.size;
+    } catch (error) {
+      console.error('Error counting used products:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Verifica se ci sono prodotti che necessitano attenzione
+   */
+  hasProductsNeedingAttention(): Observable<boolean> {
+    return this.getProductCountsForSidebar().pipe(
+      map(counts => counts.lowStock > 0 || counts.needsAttention > 0)
+    );
+  }
+
+  /**
+   * Metodo di utilità per il debug delle statistiche
+   */
+  debugProductStats(): Observable<any> {
+    return this.getProductCountsForSidebar().pipe(
+      switchMap(counts =>
+        this.getProductsRequiringAttention().pipe(
+          map(attention => ({
+            counts,
+            attention,
+            timestamp: new Date().toISOString()
+          }))
+        )
+      )
+    );
+  }
+
 }
