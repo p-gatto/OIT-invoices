@@ -57,11 +57,11 @@ export class SidebarComponent {
   ]);
 
   settingsItems = signal<MenuItem[]>([
-    {
+    /* {
       icon: 'settings',
       label: 'Impostazioni',
       route: '/settings'
-    },
+    }, */
     {
       icon: 'help',
       label: 'Aiuto',

@@ -33,9 +33,9 @@
 
     <!-- Secondary Menu -->
     <div class="px-2">
-      <h3 class="text-sm font-medium text-on-surface-variant mb-2 px-3">
+      <!-- <h3 class="text-sm font-medium text-on-surface-variant mb-2 px-3">
         Impostazioni
-      </h3>
+      </h3> -->
       <mat-nav-list>
         @for (item of settingsItems(); track item.route) {
         <mat-list-item [routerLink]="item.route" routerLinkActive="active-menu-item" (click)="onMenuItemClick(item)"
