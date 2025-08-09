@@ -19,13 +19,21 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { ConfirmationDialogComponent } from '../../shared/components/confirmation-dialog/confirmation-dialog.component';
 
-import { Customer } from './customer.model';
-import { CustomerService } from './customer.service';
+import { Customer, isActiveCustomer, isInactiveCustomer } from './customer.model';
+import { CustomerService, DeleteCustomerResult } from './customer.service';
 import { CustomerDiaogComponent } from './customer-diaog/customer-diaog.component';
 
 // Interfaccia per gestire l'apertura automatica del dialogo
 export interface CustomerDialogTrigger {
   openNewCustomerDialog(): void;
+}
+
+// Nuovo componente dialog per gestire le opzioni di eliminazione
+interface DeleteConfirmationData {
+  customer: Customer;
+  hasInvoices: boolean;
+  invoiceCount: number;
+  canForceDelete: boolean;
 }
 
 @Component({
@@ -61,29 +69,34 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
   route = inject(ActivatedRoute);
 
   customers = signal<Customer[]>([]);
-  searchQuery = signal('');
   loading = signal(true);
-  displayedColumns = ['name', 'contact', 'tax_info', 'address', 'actions'];
+  showInactive = signal(false); // Toggle per mostrare clienti disattivati
 
-  // Statistiche per ogni cliente
-  customerStats = signal<Map<string, any>>(new Map());
-
-  // Signal per gestire la selezione di un cliente specifico
+  // Signal per i filtri
+  searchQuery = signal('');
   selectedCustomerId = signal<string | null>(null);
 
+  displayedColumns = ['name', 'contact', 'tax_info', 'address', 'actions'];
+
+  // Computed per clienti filtrati con supporto per stato attivo/inattivo
   filteredCustomers = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     const selectedId = this.selectedCustomerId();
+    const includeInactive = this.showInactive();
 
     let filtered = this.customers();
 
-    // Se c'è un cliente selezionato dai query params, filtra solo quello
+    // Filtra per stato attivo/inattivo
+    if (!includeInactive) {
+      filtered = filtered.filter(customer => isActiveCustomer(customer));
+    }
+
+    // Altri filtri esistenti...
     if (selectedId) {
       filtered = filtered.filter(customer => customer.id === selectedId);
     }
 
-    // Applica il filtro di ricerca se presente
-    if (query && !selectedId) {
+    if (query) {
       filtered = filtered.filter(customer =>
         customer.name.toLowerCase().includes(query) ||
         customer.email?.toLowerCase().includes(query) ||
@@ -97,7 +110,20 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
     return filtered;
   });
 
-  constructor() { }
+  // Computed per le statistiche generali
+  overallStats = computed(() => {
+    const all = this.customers();
+    const active = all.filter(isActiveCustomer);
+    const inactive = all.filter(isInactiveCustomer);
+
+    return {
+      total: all.length,
+      active: active.length,
+      inactive: inactive.length
+    };
+  });
+
+  private customerStatsMap = signal<Map<string, any>>(new Map());
 
   ngOnInit() {
     this.loadCustomers();
@@ -114,12 +140,27 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
     });
   }
 
+  private loadCustomerStats(customerId: string) {
+    this.customerService.getCustomerStats(customerId).subscribe({
+      next: stats => {
+        const currentStats = this.customerStatsMap();
+        currentStats.set(customerId, stats);
+        this.customerStatsMap.set(new Map(currentStats));
+      },
+      error: error => {
+        console.error(`Error loading stats for customer ${customerId}:`, error);
+      }
+    });
+  }
+
+  // Nel loadCustomers, carica le statistiche per ogni cliente
   private loadCustomers() {
     this.loading.set(true);
     this.customerService.getCustomers().subscribe({
       next: customers => {
         this.customers.set(customers);
         this.loading.set(false);
+
         // Carica le statistiche per ogni cliente
         customers.forEach(customer => {
           if (customer.id) {
@@ -135,17 +176,220 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
     });
   }
 
-  private loadCustomerStats(customerId: string) {
-    this.customerService.getCustomerStats(customerId).subscribe({
-      next: stats => {
-        const currentStats = this.customerStats();
-        currentStats.set(customerId, stats);
-        this.customerStats.set(new Map(currentStats));
-      },
-      error: error => {
-        console.error(`Error loading stats for customer ${customerId}:`, error);
+  /**
+   * Mostra dialog di conferma personalizzato basato sullo stato del cliente
+   */
+  private showDeleteConfirmation(customer: Customer, hasInvoices: boolean, invoiceCount: number) {
+    const isActive = isActiveCustomer(customer);
+
+    let title: string;
+    let message: string;
+    let options: Array<{ text: string; action: string; color?: string }> = [];
+
+    if (!hasInvoices) {
+      // Cliente senza fatture - può essere eliminato definitivamente
+      title = 'Elimina Cliente';
+      message = `Il cliente "${customer.name}" non ha fatture associate. Può essere eliminato definitivamente.`;
+      options = [
+        { text: 'Annulla', action: 'cancel' },
+        { text: 'Elimina Definitivamente', action: 'hard-delete', color: 'warn' }
+      ];
+    } else if (isActive) {
+      // Cliente attivo con fatture - offri soft delete o force delete
+      title = 'Gestisci Cliente con Fatture';
+      message = `Il cliente "${customer.name}" ha ${invoiceCount} fatture associate. Scegli come procedere:`;
+      options = [
+        { text: 'Annulla', action: 'cancel' },
+        { text: 'Disattiva Cliente', action: 'soft-delete' },
+        { text: 'Elimina Comunque (PERICOLOSO)', action: 'force-delete', color: 'warn' }
+      ];
+    } else {
+      // Cliente già disattivato - offri ripristino o force delete
+      title = 'Cliente Disattivato';
+      message = `Il cliente "${customer.name}" è già disattivato e ha ${invoiceCount} fatture associate.`;
+      options = [
+        { text: 'Annulla', action: 'cancel' },
+        { text: 'Riattiva Cliente', action: 'restore' },
+        { text: 'Elimina Definitivamente (PERICOLOSO)', action: 'force-delete', color: 'warn' }
+      ];
+    }
+
+    this.showCustomDeleteDialog(title, message, options, customer, hasInvoices, invoiceCount);
+  }
+
+  /**
+   * Dialog personalizzato per le opzioni di eliminazione
+   */
+  private showCustomDeleteDialog(
+    title: string,
+    message: string,
+    options: Array<{ text: string; action: string; color?: string }>,
+    customer: Customer,
+    hasInvoices: boolean,
+    invoiceCount: number
+  ) {
+    // Qui potresti creare un dialog component personalizzato, per ora uso quello esistente
+    // Per semplicità, creo dialog sequenziali per le diverse opzioni
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '600px',
+      data: {
+        title,
+        message: `${message}\n\n⚠️ IMPORTANTE:\n- Disattiva: Il cliente viene nascosto ma i dati rimangono\n- Elimina: I dati vengono cancellati definitivamente`,
+        confirmText: hasInvoices ? 'Disattiva Cliente' : 'Elimina Definitivamente',
+        cancelText: 'Annulla'
       }
     });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        if (hasInvoices) {
+          this.performSoftDelete(customer);
+        } else {
+          this.performHardDelete(customer);
+        }
+      }
+    });
+  }
+
+  /**
+   * Esegue soft delete con conferma aggiuntiva per force delete
+   */
+  private performSoftDelete(customer: Customer) {
+    this.customerService.softDeleteCustomer(customer.id!, 'Disattivato dall\'interfaccia utente').subscribe({
+      next: (result: DeleteCustomerResult) => {
+        this.handleDeleteSuccess(result);
+        this.offerForceDeleteOption(customer);
+      },
+      error: (error) => {
+        this.handleDeleteError(error, customer.name);
+      }
+    });
+  }
+
+  /**
+   * Offre opzione di force delete dopo soft delete
+   */
+  private offerForceDeleteOption(customer: Customer) {
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '500px',
+      data: {
+        title: 'Eliminazione Completa',
+        message: `Il cliente "${customer.name}" è stato disattivato. Vuoi eliminarlo completamente dal database?\n\n⚠️ ATTENZIONE: Questa operazione eliminerà DEFINITIVAMENTE tutti i dati del cliente e renderà orfane le sue fatture.`,
+        confirmText: 'Elimina Definitivamente',
+        cancelText: 'Mantieni Disattivato'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.performHardDelete(customer);
+      }
+    });
+  }
+
+  /**
+   * Esegue hard delete
+   */
+  private performHardDelete(customer: Customer) {
+    this.customerService.forceDeleteCustomer(customer.id!, 'Eliminazione diretta - cliente senza fatture').subscribe({
+      next: (result: DeleteCustomerResult) => {
+        this.handleDeleteSuccess(result);
+      },
+      error: (error) => {
+        this.handleDeleteError(error, customer.name);
+      }
+    });
+  }
+
+  /**
+   * Ripristina un cliente disattivato
+   */
+  restoreCustomer(customer: Customer) {
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '500px',
+      data: {
+        title: 'Ripristina Cliente',
+        message: `Sei sicuro di voler riattivare il cliente "${customer.name}"? Diventerà nuovamente visibile e utilizzabile.`,
+        confirmText: 'Riattiva',
+        cancelText: 'Annulla'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.customerService.restoreCustomer(customer.id!).subscribe({
+          next: (restoredCustomer) => {
+            this.snackBar.open(`Cliente "${restoredCustomer.name}" riattivato con successo`, 'Chiudi', { duration: 3000 });
+            this.loadCustomers();
+          },
+          error: (error) => {
+            this.snackBar.open('Errore durante il ripristino del cliente', 'Chiudi', { duration: 3000 });
+            console.error('Error restoring customer:', error);
+          }
+        });
+      }
+    });
+  }
+
+
+  /**
+   * Gestisce il successo dell'eliminazione
+   */
+  private handleDeleteSuccess(result: DeleteCustomerResult) {
+    let message = result.message;
+    let duration = 4000;
+
+    if (result.type === 'hard' && result.hasInvoices) {
+      duration = 8000; // Messaggio più lungo per eliminazioni rischiose
+    }
+
+    this.snackBar.open(message, 'Chiudi', { duration });
+    this.loadCustomers();
+  }
+
+  /**
+   * Gestisce gli errori di eliminazione
+   */
+  private handleDeleteError(error: any, customerName: string) {
+    console.error('Error deleting customer:', error);
+    let message = `Errore nell'eliminazione del cliente "${customerName}"`;
+
+    if (error.message?.includes('foreign key')) {
+      message = `Impossibile eliminare "${customerName}": ha fatture associate. Prova la disattivazione.`;
+    }
+
+    this.snackBar.open(message, 'Chiudi', { duration: 5000 });
+  }
+
+  /**
+   * Toggle per mostrare/nascondere clienti disattivati
+   */
+  toggleShowInactive() {
+    this.showInactive.update(value => !value);
+  }
+
+  /**
+   * Verifica se un cliente è attivo
+   */
+  isCustomerActive(customer: Customer): boolean {
+    return isActiveCustomer(customer);
+  }
+
+  /**
+   * Ottiene la classe CSS per lo stato del cliente
+   */
+  getCustomerStatusClass(customer: Customer): string {
+    return isActiveCustomer(customer)
+      ? 'bg-green-100 text-green-800'
+      : 'bg-gray-100 text-gray-800';
+  }
+
+  /**
+     * Ottiene l'etichetta dello stato del cliente
+     */
+  getCustomerStatusLabel(customer: Customer): string {
+    return isActiveCustomer(customer) ? 'Attivo' : 'Disattivato';
   }
 
   /**
@@ -315,49 +559,31 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
     });
   }
 
+
+  /**
+   * Metodo principale per eliminare un cliente
+   * Mostra dialog con opzioni basate sullo stato del cliente
+   */
   deleteCustomer(customer: Customer) {
-    // Prima verifica se il cliente ha fatture
-    this.customerService.hasInvoices(customer.id!).subscribe(hasInvoices => {
-      let message = `Sei sicuro di voler eliminare il cliente "${customer.name}"?`;
+    this.loading.set(true);
 
-      if (hasInvoices) {
-        message = `ATTENZIONE: Il cliente "${customer.name}" ha fatture associate. Eliminando il cliente, le fatture rimarranno orfane. Sei sicuro di voler procedere?`;
-      }
-
-      const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
-        width: '500px',
-        data: {
-          title: 'Elimina Cliente',
-          message: message,
-          confirmText: 'Elimina',
-          cancelText: 'Annulla'
-        }
-      });
-
-      dialogRef.afterClosed().subscribe(result => {
-        if (result && customer.id) {
-          this.performDelete(customer.id, customer.name);
-        }
-      });
-    });
-  }
-
-  private performDelete(customerId: string, customerName: string) {
-    this.customerService.deleteCustomer(customerId).subscribe({
-      next: () => {
-        this.snackBar.open(`Cliente "${customerName}" eliminato con successo`, 'Chiudi', { duration: 3000 });
-        this.loadCustomers();
+    this.customerService.getCustomerStats(customer.id!).subscribe({
+      next: (stats) => {
+        this.loading.set(false);
+        this.showDeleteConfirmation(customer, stats.totalInvoices > 0, stats.totalInvoices);
       },
       error: (error) => {
-        this.snackBar.open('Errore nell\'eliminazione del cliente', 'Chiudi', { duration: 3000 });
-        console.error('Error deleting customer:', error);
+        this.loading.set(false);
+        console.error('Error getting customer stats:', error);
+        this.snackBar.open('Errore nel caricamento delle informazioni cliente', 'Chiudi', { duration: 3000 });
       }
     });
   }
+
 
   getCustomerStats(customerId: string | undefined) {
     if (!customerId) return null;
-    return this.customerStats().get(customerId);
+    return this.customerStatsMap().get(customerId);
   }
 
   createInvoiceForCustomer(customer: Customer) {
