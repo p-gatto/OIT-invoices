@@ -20,7 +20,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ConfirmationDialogComponent } from '../../shared/components/confirmation-dialog/confirmation-dialog.component';
 
 import { Customer, isActiveCustomer, isInactiveCustomer } from './customer.model';
-import { CustomerService, DeleteCustomerResult } from './customer.service';
+import { CustomerService, DeleteCustomerOptions, DeleteCustomerResult } from './customer.service';
 import { CustomerDiaogComponent } from './customer-diaog/customer-diaog.component';
 
 // Interfaccia per gestire l'apertura automatica del dialogo
@@ -184,37 +184,109 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
 
     let title: string;
     let message: string;
-    let options: Array<{ text: string; action: string; color?: string }> = [];
+    let deleteAction: 'soft' | 'hard' | 'force' = 'soft';
 
     if (!hasInvoices) {
       // Cliente senza fatture - può essere eliminato definitivamente
       title = 'Elimina Cliente';
-      message = `Il cliente "${customer.name}" non ha fatture associate. Può essere eliminato definitivamente.`;
-      options = [
-        { text: 'Annulla', action: 'cancel' },
-        { text: 'Elimina Definitivamente', action: 'hard-delete', color: 'warn' }
-      ];
+      message = `Il cliente "${customer.name}" non ha fatture associate. Verrà eliminato definitivamente dal database.`;
+      deleteAction = 'hard';
     } else if (isActive) {
-      // Cliente attivo con fatture - offri soft delete o force delete
-      title = 'Gestisci Cliente con Fatture';
-      message = `Il cliente "${customer.name}" ha ${invoiceCount} fatture associate. Scegli come procedere:`;
-      options = [
-        { text: 'Annulla', action: 'cancel' },
-        { text: 'Disattiva Cliente', action: 'soft-delete' },
-        { text: 'Elimina Comunque (PERICOLOSO)', action: 'force-delete', color: 'warn' }
-      ];
+      // Cliente attivo con fatture - solo soft delete
+      title = 'Disattiva Cliente';
+      message = `Il cliente "${customer.name}" ha ${invoiceCount} fatture associate. Sarà disattivato per preservare l'integrità dei dati.`;
+      deleteAction = 'soft';
     } else {
-      // Cliente già disattivato - offri ripristino o force delete
+      // Cliente già disattivato - offri opzioni
       title = 'Cliente Disattivato';
-      message = `Il cliente "${customer.name}" è già disattivato e ha ${invoiceCount} fatture associate.`;
-      options = [
-        { text: 'Annulla', action: 'cancel' },
-        { text: 'Riattiva Cliente', action: 'restore' },
-        { text: 'Elimina Definitivamente (PERICOLOSO)', action: 'force-delete', color: 'warn' }
-      ];
+      message = `Il cliente "${customer.name}" è già disattivato. Vuoi riattivarlo o eliminarlo definitivamente?`;
+      this.showRestoreOrForceDeleteDialog(customer, invoiceCount);
+      return;
     }
 
-    this.showCustomDeleteDialog(title, message, options, customer, hasInvoices, invoiceCount);
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '600px',
+      data: {
+        title,
+        message,
+        confirmText: deleteAction === 'hard' ? 'Elimina Definitivamente' : 'Disattiva',
+        cancelText: 'Annulla'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.executeDelete(customer, deleteAction, hasInvoices, invoiceCount);
+      }
+    });
+  }
+
+  private showRestoreOrForceDeleteDialog(customer: Customer, invoiceCount: number) {
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '600px',
+      data: {
+        title: 'Cliente Disattivato',
+        message: `Il cliente "${customer.name}" è disattivato. Scegli l'azione:`,
+        confirmText: 'Riattiva',
+        cancelText: 'Annulla'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.restoreCustomer(customer);
+      } else {
+        // Offri opzione di eliminazione forzata
+        this.showForceDeleteConfirmation(customer, invoiceCount);
+      }
+    });
+  }
+
+  private showForceDeleteConfirmation(customer: Customer, invoiceCount: number) {
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '600px',
+      data: {
+        title: '⚠️ ELIMINAZIONE DEFINITIVA',
+        message: `ATTENZIONE: Eliminare definitivamente "${customer.name}" renderà orfane ${invoiceCount} fatture. Questa operazione è IRREVERSIBILE.\n\nSei assolutamente sicuro?`,
+        confirmText: 'SÌ, ELIMINA DEFINITIVAMENTE',
+        cancelText: 'No, mantieni disattivato'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.executeDelete(customer, 'force', true, invoiceCount);
+      }
+    });
+  }
+
+  private executeDelete(customer: Customer, action: 'soft' | 'hard' | 'force', hasInvoices: boolean, invoiceCount: number) {
+    const options: DeleteCustomerOptions = {
+      force: action === 'force',
+      reason: this.getDeleteReason(action, hasInvoices, invoiceCount)
+    };
+
+    this.customerService.deleteCustomer(customer.id!, options).subscribe({
+      next: (result: DeleteCustomerResult) => {
+        this.handleDeleteSuccess(result);
+      },
+      error: (error) => {
+        this.handleDeleteError(error, customer.name);
+      }
+    });
+  }
+
+  private getDeleteReason(action: 'soft' | 'hard' | 'force', hasInvoices: boolean, invoiceCount: number): string {
+    switch (action) {
+      case 'soft':
+        return `Cliente disattivato - ha ${invoiceCount} fatture associate`;
+      case 'hard':
+        return 'Cliente eliminato - nessuna fattura associata';
+      case 'force':
+        return `Eliminazione forzata - ${invoiceCount} fatture rese orfane`;
+      default:
+        return 'Eliminazione cliente';
+    }
   }
 
   /**

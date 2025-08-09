@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 
-import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, from, map, Observable, of, switchMap, tap } from 'rxjs';
 
 import { SupabaseService } from '../../core/database/supabase.service';
 
@@ -110,23 +110,125 @@ export class CustomerService {
    * Decide automaticamente tra soft delete e hard delete
    */
   deleteCustomer(id: string, options: DeleteCustomerOptions = {}): Observable<DeleteCustomerResult> {
+    //console.log('🔍 CustomerService.deleteCustomer chiamato:', { id, options });
+
     return this.getCustomerWithInvoiceInfo(id).pipe(
       switchMap(({ customer, hasInvoices, invoiceCount }) => {
+        //console.log('📊 Info cliente:', { customer: customer?.name, hasInvoices, invoiceCount });
+
         if (!customer) {
           throw new Error('Cliente non trovato');
         }
 
         if (hasInvoices && !options.force) {
-          // Soft delete se ha fatture e non è forzato
+          //console.log('💤 Eseguendo SOFT DELETE (cliente ha fatture)');
           return this.performSoftDelete(customer, invoiceCount, options.reason);
         } else {
-          // Hard delete se non ha fatture o è forzato
+          //console.log('🗑️ Eseguendo HARD DELETE', { hasInvoices, force: options.force });
           return this.performHardDelete(customer, hasInvoices, invoiceCount, options.reason);
         }
       }),
       catchError(error => {
-        console.error('Error in deleteCustomer:', error);
+        console.error('❌ Errore in deleteCustomer:', error);
         throw error;
+      })
+    );
+  }
+
+  private performHardDelete(
+    customer: Customer,
+    hasInvoices: boolean,
+    invoiceCount: number,
+    reason?: string
+  ): Observable<DeleteCustomerResult> {
+    /* console.log('🗑️ performHardDelete START:', {
+      customerId: customer.id,
+      customerName: customer.name,
+      hasInvoices,
+      invoiceCount
+    });
+ */
+    // Log dell'operazione per audit
+    /* console.warn('🚨 HARD DELETE CUSTOMER:', {
+      customer_id: customer.id,
+      customer_name: customer.name,
+      had_invoices: hasInvoices,
+      invoice_count: invoiceCount,
+      deletion_reason: reason,
+      deleted_at: new Date().toISOString()
+    }); */
+
+    return from(
+      this.supabase.client
+        .from('customers')
+        .delete()
+        .eq('id', customer.id)
+        .select() // Aggiungi select per vedere cosa viene eliminato
+    ).pipe(
+      map(({ data, error }) => {
+        //console.log('📤 Supabase delete response:', { data, error });
+
+        if (error) {
+          console.error('❌ Supabase hard delete error:', error);
+          throw error;
+        }
+
+        //console.log('✅ Hard delete successful, data eliminated:', data);
+        this.loadCustomers(); // Ricarica la lista
+
+        let message = `Cliente "${customer.name}" eliminato definitivamente.`;
+        if (hasInvoices) {
+          message += ` ATTENZIONE: ${invoiceCount} fatture sono ora orfane.`;
+        }
+
+        const result: DeleteCustomerResult = {
+          type: 'hard' as const,
+          customer,
+          hasInvoices,
+          invoiceCount,
+          message
+        };
+
+        //console.log('🎯 Hard delete result:', result);
+        return result;
+      }),
+      catchError(error => {
+        console.error('💥 Error performing hard delete:', error);
+        throw error;
+      })
+    );
+  }
+
+  // Metodo di verifica per debugging
+  checkCustomerExists(id: string): Observable<boolean> {
+    return from(
+      this.supabase.client
+        .from('customers')
+        .select('id, name')
+        .eq('id', id)
+        .single()
+    ).pipe(
+      map(({ data, error }) => {
+        if (error && error.code === 'PGRST116') {
+          console.log('👻 Cliente non trovato nel database:', id);
+          return false;
+        }
+        if (error) {
+          console.error('❌ Errore verifica esistenza cliente:', error);
+          throw error;
+        }
+        console.log('✅ Cliente trovato nel database:', data);
+        return true;
+      })
+    );
+  }
+
+  // Metodo per forzare la ricarica e verificare
+  forceReloadAndCheck(deletedCustomerId: string): Observable<boolean> {
+    return this.getCustomers().pipe(
+      switchMap(() => this.checkCustomerExists(deletedCustomerId)),
+      tap(exists => {
+        console.log(`🔍 Dopo reload, cliente ${deletedCustomerId} esiste ancora:`, exists);
       })
     );
   }
@@ -159,7 +261,7 @@ export class CustomerService {
     ).pipe(
       map(({ data, error }) => {
         if (error) {
-          console.error('Supabase soft delete error:', error);
+          //console.error('Supabase soft delete error:', error);
           throw error;
         }
 
@@ -175,60 +277,6 @@ export class CustomerService {
       }),
       catchError(error => {
         console.error('Error performing soft delete:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Esegue l'hard delete - VERSIONE CORRETTA
-   */
-  private performHardDelete(
-    customer: Customer,
-    hasInvoices: boolean,
-    invoiceCount: number,
-    reason?: string
-  ): Observable<DeleteCustomerResult> {
-
-    // Log dell'operazione per audit
-    console.warn('HARD DELETE CUSTOMER:', {
-      customer_id: customer.id,
-      customer_name: customer.name,
-      had_invoices: hasInvoices,
-      invoice_count: invoiceCount,
-      deletion_reason: reason,
-      deleted_at: new Date().toISOString()
-    });
-
-    return from(
-      this.supabase.client
-        .from('customers')
-        .delete()
-        .eq('id', customer.id)
-    ).pipe(
-      map(({ error }) => {
-        if (error) {
-          console.error('Supabase hard delete error:', error);
-          throw error;
-        }
-
-        this.loadCustomers(); // Ricarica la lista
-
-        let message = `Cliente "${customer.name}" eliminato definitivamente.`;
-        if (hasInvoices) {
-          message += ` ATTENZIONE: ${invoiceCount} fatture sono ora orfane.`;
-        }
-
-        return {
-          type: 'hard' as const,
-          customer,
-          hasInvoices,
-          invoiceCount,
-          message
-        };
-      }),
-      catchError(error => {
-        console.error('Error performing hard delete:', error);
         throw error;
       })
     );
