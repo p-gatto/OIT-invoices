@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 
-import { catchError, from, map, Observable, of } from 'rxjs';
+import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
 
 import { SupabaseService } from '../../core/database/supabase.service';
 import { Product, ProductCategory } from './product.model';
@@ -175,12 +175,13 @@ export class ProductService {
   }
 
   createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Observable<Product> {
+
     const cleanProduct = {
-      name: product.name?.trim(),
-      description: product.description?.trim() || null,
-      unit_price: Number(product.unit_price),
-      tax_rate: Number(product.tax_rate),
-      category: product.category?.trim() || null,
+      name: product.name?.trim() || '',
+      description: product.description?.trim() || null, // null invece di stringa vuota
+      unit_price: Number(product.unit_price) || 0,
+      tax_rate: Number(product.tax_rate) || 22,
+      category: product.category?.trim() || null, // null invece di stringa vuota
       unit: product.unit || 'pz',
       is_active: Boolean(product.is_active)
     };
@@ -207,16 +208,31 @@ export class ProductService {
   updateProduct(product: Product): Observable<Product> {
     const { id, created_at, ...updateData } = product;
 
+    if (!id) {
+      throw new Error('ID prodotto mancante per l\'aggiornamento');
+    }
+
+    // Pulisci i dati rimuovendo valori undefined e gestendo null appropriatamente
+    const cleanUpdateData = {
+      name: updateData.name?.trim() || '',
+      description: updateData.description?.trim() || null,
+      unit_price: Number(updateData.unit_price) || 0,
+      tax_rate: Number(updateData.tax_rate) || 22,
+      category: updateData.category?.trim() || null,
+      unit: updateData.unit || 'pz',
+      is_active: Boolean(updateData.is_active),
+      updated_at: new Date().toISOString()
+    };
+
+    // Rimuovi completamente i campi undefined per evitare problemi con Supabase
+    const finalUpdateData = Object.fromEntries(
+      Object.entries(cleanUpdateData).filter(([_, value]) => value !== undefined)
+    );
+
     return from(
       this.supabase.client
         .from('products')
-        .update({
-          ...updateData,
-          name: updateData.name?.trim(),
-          description: updateData.description?.trim() || null,
-          category: updateData.category?.trim() || null,
-          updated_at: new Date().toISOString()
-        })
+        .update(finalUpdateData)
         .eq('id', id)
         .select()
         .single()
@@ -233,20 +249,46 @@ export class ProductService {
     );
   }
 
+  /**
+ * Elimina fisicamente un prodotto dal database (hard delete)
+ * Verifica prima che non sia utilizzato in fatture
+ */
   deleteProduct(id: string): Observable<void> {
-    return from(
-      this.supabase.client
-        .from('products')
-        .update({
-          is_active: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-    ).pipe(
-      map(({ error }) => {
-        if (error) throw error;
-        this.loadProducts();
-        return;
+    // Prima verifica se il prodotto è utilizzato in fatture
+    return this.isProductUsedInInvoices(id).pipe(
+      switchMap(isUsed => {
+        if (isUsed) {
+          // Se è utilizzato, fai solo soft delete per preservare l'integrità
+          return from(
+            this.supabase.client
+              .from('products')
+              .update({
+                is_active: false,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', id)
+          ).pipe(
+            map(({ error }) => {
+              if (error) throw error;
+              this.loadProducts();
+              return;
+            })
+          );
+        } else {
+          // Se non è utilizzato, elimina fisicamente (HARD DELETE)
+          return from(
+            this.supabase.client
+              .from('products')
+              .delete()
+              .eq('id', id)
+          ).pipe(
+            map(({ error }) => {
+              if (error) throw error;
+              this.loadProducts();
+              return;
+            })
+          );
+        }
       }),
       catchError(error => {
         console.error(`Error deleting product with ID ${id}:`, error);

@@ -183,7 +183,9 @@ export class ProductsComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        if (product) {
+        // Se il result ha un ID, è un aggiornamento
+        // Se non ha ID, è una creazione
+        if (result.id) {
           this.updateProduct(result);
         } else {
           this.createProduct(result);
@@ -223,27 +225,41 @@ export class ProductsComponent implements OnInit {
   }
 
   deleteProduct(product: Product) {
-    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      width: '500px',
-      data: {
-        title: 'Elimina Prodotto',
-        message: `Sei sicuro di voler eliminare "${product.name}"?`,
-        confirmText: 'Elimina',
-        cancelText: 'Annulla'
-      }
-    });
+    // Prima verifica se il prodotto è utilizzato in fatture
+    this.productService.isProductUsedInInvoices(product.id!).subscribe(isUsed => {
+      let title = 'Elimina Prodotto';
+      let message = `Sei sicuro di voler eliminare "${product.name}"?`;
 
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.performDelete(product.id!, product.name);
+      if (isUsed) {
+        title = 'Prodotto utilizzato in fatture';
+        message = `Il prodotto "${product.name}" è utilizzato in fatture esistenti. Sarà disattivato invece di essere eliminato per preservare l'integrità dei dati. Continuare?`;
+      } else {
+        message = `Sei sicuro di voler eliminare DEFINITIVAMENTE "${product.name}"? Il prodotto verrà rimosso completamente dal database.`;
       }
+
+      const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+        width: '500px',
+        data: {
+          title,
+          message,
+          confirmText: isUsed ? 'Disattiva' : 'Elimina',
+          cancelText: 'Annulla'
+        }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.performDelete(product.id!, product.name, isUsed);
+        }
+      });
     });
   }
 
-  private performDelete(productId: string, productName: string) {
+  private performDelete(productId: string, productName: string, wasUsedInInvoices: boolean) {
     this.productService.deleteProduct(productId).subscribe({
       next: () => {
-        this.snackBar.open(`Prodotto "${productName}" eliminato con successo`, 'Chiudi', { duration: 3000 });
+        const action = wasUsedInInvoices ? 'disattivato' : 'eliminato';
+        this.snackBar.open(`Prodotto "${productName}" ${action} con successo`, 'Chiudi', { duration: 3000 });
         this.loadData();
       },
       error: (error) => {
@@ -254,14 +270,21 @@ export class ProductsComponent implements OnInit {
   }
 
   duplicateProduct(product: Product) {
-    // Crea una copia pulita del prodotto rimuovendo tutti i campi di sistema
-    const { id, created_at, updated_at, ...productData } = product;
-
-    const duplicatedProduct: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
-      ...productData,
-      name: `${product.name} (Copia)`
+    // Crea una copia pulita del prodotto SENZA ID
+    // In questo modo il dialog lo tratterà come nuovo prodotto
+    const duplicatedProduct = {
+      name: `${product.name} (Copia)`,
+      description: product.description || '',
+      unit_price: product.unit_price || 0,
+      tax_rate: product.tax_rate || 22,
+      category: product.category || '',
+      unit: product.unit || 'pz',
+      is_active: product.is_active !== undefined ? product.is_active : true
+      // NOTA: NON includiamo id, created_at, updated_at
     };
 
+    // Chiama openProductDialog con il prodotto duplicato
+    // Il metodo openProductDialog gestirà automaticamente create vs update
     this.openProductDialog(duplicatedProduct);
   }
 

@@ -49,7 +49,7 @@ export class ProductDialogComponent {
       const formValue = this.productForm.value;
 
       // Crea l'oggetto risultato con validazione esplicita di ogni campo
-      const result: Partial<Product> = {
+      const result: any = {
         name: formValue.name?.trim() || '',
         unit_price: Number(formValue.unit_price) || 0,
         tax_rate: Number(formValue.tax_rate) || 0,
@@ -57,8 +57,9 @@ export class ProductDialogComponent {
         is_active: Boolean(formValue.is_active)
       };
 
-      // Aggiungi ID solo se stiamo modificando un prodotto esistente
-      if (this.data?.id) {
+      // Aggiungi ID SOLO se this.data ha un ID valido
+      // Questo distingue tra modifica (con ID) e creazione/duplicazione (senza ID)
+      if (this.data && this.data.id) {
         result.id = this.data.id;
       }
 
