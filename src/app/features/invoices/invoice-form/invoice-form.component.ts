@@ -158,10 +158,9 @@ export class InvoiceFormComponent implements OnInit {
   private setupTotalCalculations() {
     // Sottoscrivi ai cambiamenti dell'intero FormArray
     this.itemsFormArray.valueChanges.pipe(
-      debounceTime(100), // Evita calcoli troppo frequenti
+      debounceTime(100),
       distinctUntilChanged()
     ).subscribe(() => {
-      console.log('FormArray changed, recalculating totals...');
       this.calculateAllTotals();
     });
 
@@ -175,7 +174,6 @@ export class InvoiceFormComponent implements OnInit {
     let newSubtotal = 0;
     let newTaxAmount = 0;
 
-    // Calcola i totali da tutti gli items
     this.itemsFormArray.controls.forEach((item, index) => {
       const quantity = Number(item.get('quantity')?.value) || 0;
       const unitPrice = Number(item.get('unit_price')?.value) || 0;
@@ -183,27 +181,19 @@ export class InvoiceFormComponent implements OnInit {
 
       const itemSubtotal = quantity * unitPrice;
       const itemTax = itemSubtotal * (taxRate / 100);
+      const itemTotal = itemSubtotal + itemTax;
 
       newSubtotal += itemSubtotal;
       newTaxAmount += itemTax;
 
-      // Aggiorna anche il totale del singolo item
-      const itemTotal = itemSubtotal + itemTax;
+      // Aggiorna il totale dell'item
       item.get('total')?.setValue(itemTotal, { emitEvent: false });
     });
-
-    const newTotal = newSubtotal + newTaxAmount;
 
     // Aggiorna i signals
     this.subtotal.set(newSubtotal);
     this.taxAmount.set(newTaxAmount);
-    this.total.set(newTotal);
-
-    console.log('Totals calculated:', {
-      subtotal: newSubtotal,
-      taxAmount: newTaxAmount,
-      total: newTotal
-    });
+    this.total.set(newSubtotal + newTaxAmount);
   }
 
   getItemSubtotal(index: number): number {
@@ -466,24 +456,19 @@ export class InvoiceFormComponent implements OnInit {
   private setupItemCalculations(index: number) {
     const item = this.itemsFormArray.at(index);
 
-    // Listen to changes in quantity, unit_price, or tax_rate
+    // Listen ai cambiamenti dei campi che influenzano il totale
     ['quantity', 'unit_price', 'tax_rate'].forEach(field => {
       item.get(field)?.valueChanges.pipe(
-        debounceTime(50)
-      ).subscribe((value) => {
-        console.log(`Item ${index} ${field} changed to:`, value);
-        this.calculateItemTotal(index);
-        // Forza il ricalcolo generale dopo un breve delay
+        debounceTime(100),
+        distinctUntilChanged()
+      ).subscribe(() => {
+        // Forza il ricalcolo generale
         setTimeout(() => {
           this.calculateAllTotals();
         }, 10);
       });
     });
-
-    // Calcola il totale iniziale
-    this.calculateItemTotal(index);
   }
-
   calculateItemTotal(index: number) {
     const item = this.itemsFormArray.at(index);
     const quantity = Number(item.get('quantity')?.value) || 0;

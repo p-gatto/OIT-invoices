@@ -188,6 +188,7 @@ export class InvoiceService {
             switchMap(({ data: newInvoice, error: invoiceError }) => {
                 if (invoiceError) throw invoiceError;
 
+                // Se ci sono items da inserire
                 if (invoice.items && invoice.items.length > 0) {
                     const itemsToInsert = invoice.items.map(item => ({
                         invoice_id: newInvoice.id,
@@ -197,7 +198,7 @@ export class InvoiceService {
                         description: item.description.trim(),
                         unit_price: this.utilityService.roundToDecimals(item.unit_price),
                         tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1),
-                        unit: item.unit || 'pz' // ⚠️ QUESTO CAMPO MANCAVA!
+                        unit: item.unit || 'pz'
                     }));
 
                     return from(
@@ -205,15 +206,15 @@ export class InvoiceService {
                             .from('invoice_items')
                             .insert(itemsToInsert)
                             .select(`
-                            *,
-                            products(
-                                id,
-                                name,
-                                description,
-                                category,
-                                unit
-                            )
-                        `)
+              *,
+              products(
+                id,
+                name,
+                description,
+                category,
+                unit
+              )
+            `)
                     ).pipe(
                         map(({ data: insertedItems, error: itemsError }) => {
                             if (itemsError) throw itemsError;
@@ -228,6 +229,7 @@ export class InvoiceService {
                         })
                     );
                 } else {
+                    // Se non ci sono items, restituisci la fattura senza items
                     this.loadInvoices();
                     return of({
                         ...newInvoice,
@@ -258,64 +260,131 @@ export class InvoiceService {
             updated_at: new Date().toISOString()
         };
 
-        return from(
-            this.supabase.client
-                .from('invoices')
-                .update(invoiceToUpdate)
-                .eq('id', invoice.id)
-                .select()
-                .single()
-        ).pipe(
-            switchMap(({ data: updatedInvoice, error: invoiceError }) => {
-                if (invoiceError) throw invoiceError;
+        console.log('🔄 ================================');
+        console.log('🔄 STARTING UPDATE INVOICE:', invoice.id);
+        console.log('🔄 Items from form:', invoice.items?.length || 0);
+        console.log('🔄 ================================');
 
+        // STEP 1: Debug stato iniziale
+        return from(this.debugInvoiceItems(invoice.id!)).pipe(
+            switchMap(() => {
+                // STEP 2: Aggiorna la fattura
+                console.log('📝 Step 1: Updating invoice record...');
                 return from(
                     this.supabase.client
-                        .from('invoice_items')
-                        .delete()
-                        .eq('invoice_id', invoice.id)
-                ).pipe(
+                        .from('invoices')
+                        .update(invoiceToUpdate)
+                        .eq('id', invoice.id)
+                        .select()
+                        .single()
+                );
+            }),
+            switchMap(({ data: updatedInvoice, error: invoiceError }) => {
+                if (invoiceError) throw invoiceError;
+                console.log('✅ Step 1 completed: Invoice record updated');
+
+                // STEP 3: Debug prima della cancellazione
+                return from(this.debugInvoiceItems(invoice.id!)).pipe(
                     switchMap(() => {
+                        // STEP 4: Cancella items esistenti
+                        console.log('🗑️ Step 2: Deleting existing items...');
+                        return from(
+                            this.supabase.client
+                                .from('invoice_items')
+                                .delete()
+                                .eq('invoice_id', invoice.id!)
+                                .select() // Aggiungi select per vedere cosa viene cancellato
+                        );
+                    }),
+                    switchMap(({ data: deletedItems, error: deleteError }) => {
+                        if (deleteError) {
+                            console.error('❌ Error deleting items:', deleteError);
+                            throw deleteError;
+                        }
+
+                        console.log('✅ Step 2 completed: Deleted', deletedItems?.length || 0, 'items');
+                        deletedItems?.forEach((item, index) => {
+                            console.log(`   Deleted item ${index + 1}: ${item.description}`);
+                        });
+
+                        // STEP 5: Debug dopo cancellazione
+                        return from(this.debugInvoiceItems(invoice.id!));
+                    }),
+                    switchMap(() => {
+                        // STEP 6: Inserisci nuovi items
                         if (invoice.items && invoice.items.length > 0) {
-                            const itemsToInsert = invoice.items.map(item => ({
-                                invoice_id: updatedInvoice.id,
-                                product_id: item.product_id || null,
-                                quantity: this.utilityService.roundToDecimals(item.quantity, 3),
-                                total: this.utilityService.roundToDecimals(item.total),
-                                description: item.description.trim(),
-                                unit_price: this.utilityService.roundToDecimals(item.unit_price),
-                                tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1),
-                                unit: item.unit || 'pz' // ⚠️ ANCHE QUI MANCAVA!
-                            }));
+                            console.log('💾 Step 3: Inserting', invoice.items.length, 'new items...');
+
+                            const itemsToInsert = invoice.items.map((item, index) => {
+                                const cleanItem = {
+                                    invoice_id: updatedInvoice.id,
+                                    product_id: item.product_id || null,
+                                    quantity: Number(item.quantity) || 0,
+                                    total: Number(item.total) || 0,
+                                    description: (item.description || '').trim(),
+                                    unit_price: Number(item.unit_price) || 0,
+                                    tax_rate: Number(item.tax_rate) || 22,
+                                    unit: item.unit || 'pz'
+                                };
+
+                                console.log(`📦 Preparing item ${index + 1}:`, {
+                                    description: cleanItem.description,
+                                    quantity: cleanItem.quantity,
+                                    unit_price: cleanItem.unit_price
+                                });
+
+                                return cleanItem;
+                            });
 
                             return from(
                                 this.supabase.client
                                     .from('invoice_items')
                                     .insert(itemsToInsert)
                                     .select(`
-                                    *,
-                                    products(
-                                        id,
-                                        name,
-                                        description,
-                                        category,
-                                        unit
-                                    )
-                                `)
+                  *,
+                  products(
+                    id,
+                    name,
+                    description,
+                    category,
+                    unit
+                  )
+                `)
                             ).pipe(
-                                map(({ data: insertedItems, error: itemsError }) => {
-                                    if (itemsError) throw itemsError;
+                                switchMap(({ data: insertedItems, error: itemsError }) => {
+                                    if (itemsError) {
+                                        console.error('❌ Error inserting items:', itemsError);
+                                        throw itemsError;
+                                    }
 
-                                    this.loadInvoices();
+                                    console.log('✅ Step 3 completed: Inserted', insertedItems?.length || 0, 'items');
+                                    insertedItems?.forEach((item, index) => {
+                                        console.log(`   Inserted item ${index + 1}:`, {
+                                            id: item.id,
+                                            description: item.description,
+                                            created_at: item.created_at
+                                        });
+                                    });
 
-                                    return {
-                                        ...updatedInvoice,
-                                        customer: invoice.customer,
-                                        items: insertedItems || []
-                                    } as Invoice;
+                                    // STEP 7: Debug finale
+                                    return from(this.debugInvoiceItems(invoice.id!)).pipe(
+                                        map(() => {
+                                            this.loadInvoices();
+
+                                            console.log('🎉 UPDATE COMPLETED SUCCESSFULLY');
+                                            console.log('🎉 ================================');
+
+                                            return {
+                                                ...updatedInvoice,
+                                                customer: invoice.customer,
+                                                items: insertedItems || []
+                                            } as Invoice;
+                                        })
+                                    );
                                 })
                             );
                         } else {
+                            console.log('ℹ️ Step 3: No items to insert');
                             this.loadInvoices();
                             return of({
                                 ...updatedInvoice,
@@ -327,11 +396,37 @@ export class InvoiceService {
                 );
             }),
             catchError(error => {
-                console.error('Error updating invoice:', error);
+                console.error('💥 ERROR in updateInvoice:', error);
                 this.notificationService.updateError('fattura', error);
                 throw error;
             })
         );
+    }
+
+
+    async debugInvoiceItems(invoiceId: string): Promise<void> {
+        console.log('🔍 DEBUG: Checking items for invoice:', invoiceId);
+
+        const { data: existingItems, error } = await this.supabase.client
+            .from('invoice_items')
+            .select('*')
+            .eq('invoice_id', invoiceId)
+            .order('created_at');
+
+        if (error) {
+            console.error('❌ Error checking existing items:', error);
+            return;
+        }
+
+        console.log('📊 Current items in database:', existingItems?.length || 0);
+        existingItems?.forEach((item, index) => {
+            console.log(`   Item ${index + 1}:`, {
+                id: item.id,
+                description: item.description,
+                quantity: item.quantity,
+                created_at: item.created_at
+            });
+        });
     }
 
     deleteInvoice(id: string): Observable<void> {
