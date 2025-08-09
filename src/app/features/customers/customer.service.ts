@@ -123,35 +123,113 @@ export class CustomerService {
           // Hard delete se non ha fatture o è forzato
           return this.performHardDelete(customer, hasInvoices, invoiceCount, options.reason);
         }
+      }),
+      catchError(error => {
+        console.error('Error in deleteCustomer:', error);
+        throw error;
       })
     );
   }
 
   /**
-   * Soft Delete: disattiva il cliente mantenendo i dati
+   * Esegue il soft delete - VERSIONE CORRETTA
    */
-  softDeleteCustomer(id: string, reason?: string): Observable<DeleteCustomerResult> {
-    return this.getCustomerWithInvoiceInfo(id).pipe(
-      switchMap(({ customer, hasInvoices, invoiceCount }) => {
-        if (!customer) {
-          throw new Error('Cliente non trovato');
+  private performSoftDelete(
+    customer: Customer,
+    invoiceCount: number,
+    reason?: string
+  ): Observable<DeleteCustomerResult> {
+    const updateData: any = {
+      is_active: false,
+      updated_at: new Date().toISOString()
+    };
+
+    if (reason) {
+      updateData.deactivation_reason = reason;
+      updateData.deactivated_at = new Date().toISOString();
+    }
+
+    return from(
+      this.supabase.client
+        .from('customers')
+        .update(updateData)
+        .eq('id', customer.id)
+        .select()
+        .single()
+    ).pipe(
+      map(({ data, error }) => {
+        if (error) {
+          console.error('Supabase soft delete error:', error);
+          throw error;
         }
-        return this.performSoftDelete(customer, invoiceCount, reason);
+
+        this.loadCustomers(); // Ricarica la lista
+
+        return {
+          type: 'soft' as const,
+          customer: data as Customer,
+          hasInvoices: true,
+          invoiceCount,
+          message: `Cliente "${customer.name}" disattivato. Mantiene ${invoiceCount} fatture associate.`
+        };
+      }),
+      catchError(error => {
+        console.error('Error performing soft delete:', error);
+        throw error;
       })
     );
   }
 
   /**
-   * Force Delete: elimina definitivamente anche se ha fatture
-   * ATTENZIONE: Questa operazione può causare inconsistenze nei dati
+   * Esegue l'hard delete - VERSIONE CORRETTA
    */
-  forceDeleteCustomer(id: string, reason?: string): Observable<DeleteCustomerResult> {
-    return this.getCustomerWithInvoiceInfo(id).pipe(
-      switchMap(({ customer, hasInvoices, invoiceCount }) => {
-        if (!customer) {
-          throw new Error('Cliente non trovato');
+  private performHardDelete(
+    customer: Customer,
+    hasInvoices: boolean,
+    invoiceCount: number,
+    reason?: string
+  ): Observable<DeleteCustomerResult> {
+
+    // Log dell'operazione per audit
+    console.warn('HARD DELETE CUSTOMER:', {
+      customer_id: customer.id,
+      customer_name: customer.name,
+      had_invoices: hasInvoices,
+      invoice_count: invoiceCount,
+      deletion_reason: reason,
+      deleted_at: new Date().toISOString()
+    });
+
+    return from(
+      this.supabase.client
+        .from('customers')
+        .delete()
+        .eq('id', customer.id)
+    ).pipe(
+      map(({ error }) => {
+        if (error) {
+          console.error('Supabase hard delete error:', error);
+          throw error;
         }
-        return this.performHardDelete(customer, hasInvoices, invoiceCount, reason);
+
+        this.loadCustomers(); // Ricarica la lista
+
+        let message = `Cliente "${customer.name}" eliminato definitivamente.`;
+        if (hasInvoices) {
+          message += ` ATTENZIONE: ${invoiceCount} fatture sono ora orfane.`;
+        }
+
+        return {
+          type: 'hard' as const,
+          customer,
+          hasInvoices,
+          invoiceCount,
+          message
+        };
+      }),
+      catchError(error => {
+        console.error('Error performing hard delete:', error);
+        throw error;
       })
     );
   }
@@ -200,106 +278,6 @@ export class CustomerService {
       }),
       catchError(error => {
         console.error('Error getting customer info:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Esegue il soft delete
-   */
-  private performSoftDelete(
-    customer: Customer,
-    invoiceCount: number,
-    reason?: string
-  ): Observable<DeleteCustomerResult> {
-    const updateData: any = {
-      is_active: false,
-      updated_at: new Date().toISOString()
-    };
-
-    // Aggiungi metadati per audit se implementato
-    if (reason) {
-      updateData.deactivation_reason = reason;
-      updateData.deactivated_at = new Date().toISOString();
-    }
-
-    return from(
-      this.supabase.client
-        .from('customers')
-        .update(updateData)
-        .eq('id', customer.id)
-        .select()
-        .single()
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-
-        this.loadCustomers(); // Ricarica la lista
-
-        return {
-          type: 'soft' as const,
-          customer: data as Customer,
-          hasInvoices: true,
-          invoiceCount,
-          message: `Cliente "${customer.name}" disattivato. Mantiene ${invoiceCount} fatture associate.`
-        };
-      }),
-      catchError(error => {
-        console.error('Error performing soft delete:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Esegue l'hard delete
-   */
-  private performHardDelete(
-    customer: Customer,
-    hasInvoices: boolean,
-    invoiceCount: number,
-    reason?: string
-  ): Observable<DeleteCustomerResult> {
-
-    // Log dell'operazione per audit
-    const logData = {
-      customer_id: customer.id,
-      customer_name: customer.name,
-      had_invoices: hasInvoices,
-      invoice_count: invoiceCount,
-      deletion_reason: reason,
-      deleted_at: new Date().toISOString()
-    };
-
-    console.warn('HARD DELETE CUSTOMER:', logData);
-
-    return from(
-      this.supabase.client
-        .from('customers')
-        .delete()
-        .eq('id', customer.id)
-    ).pipe(
-      map(({ error }) => {
-        if (error) throw error;
-
-        this.loadCustomers(); // Ricarica la lista
-
-        let message = `Cliente "${customer.name}" eliminato definitivamente.`;
-        if (hasInvoices) {
-          message += ` ATTENZIONE: ${invoiceCount} fatture sono ora orfane.`;
-        }
-
-        return {
-          type: 'hard' as const,
-          customer,
-          hasInvoices,
-          invoiceCount,
-          message
-        };
-      }),
-      catchError(error => {
-        console.error('Error performing hard delete:', error);
         throw error;
       })
     );

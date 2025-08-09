@@ -256,7 +256,7 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
    * Esegue soft delete con conferma aggiuntiva per force delete
    */
   private performSoftDelete(customer: Customer) {
-    this.customerService.softDeleteCustomer(customer.id!, 'Disattivato dall\'interfaccia utente').subscribe({
+    this.customerService.deleteCustomer(customer.id!, { force: false, 'reason': 'Il cliente è collegato a delle fatture!!!' }).subscribe({
       next: (result: DeleteCustomerResult) => {
         this.handleDeleteSuccess(result);
         this.offerForceDeleteOption(customer);
@@ -292,7 +292,7 @@ export class CustomersComponent implements OnInit, CustomerDialogTrigger {
    * Esegue hard delete
    */
   private performHardDelete(customer: Customer) {
-    this.customerService.forceDeleteCustomer(customer.id!, 'Eliminazione diretta - cliente senza fatture').subscribe({
+    this.customerService.deleteCustomer(customer.id!, { force: true, 'reason': 'Eliminazione diretta - cliente senza fatture' }).subscribe({
       next: (result: DeleteCustomerResult) => {
         this.handleDeleteSuccess(result);
       },
