@@ -166,7 +166,6 @@ export class InvoiceService {
     }
 
     createInvoice(invoice: Omit<Invoice, 'id' | 'created_at'>): Observable<Invoice> {
-        // Prepara i dati per l'inserimento
         const invoiceToInsert = {
             invoice_number: invoice.invoice_number,
             customer_id: invoice.customer_id,
@@ -189,7 +188,6 @@ export class InvoiceService {
             switchMap(({ data: newInvoice, error: invoiceError }) => {
                 if (invoiceError) throw invoiceError;
 
-                // Inserisci anche gli items se presenti
                 if (invoice.items && invoice.items.length > 0) {
                     const itemsToInsert = invoice.items.map(item => ({
                         invoice_id: newInvoice.id,
@@ -198,7 +196,8 @@ export class InvoiceService {
                         total: this.utilityService.roundToDecimals(item.total),
                         description: item.description.trim(),
                         unit_price: this.utilityService.roundToDecimals(item.unit_price),
-                        tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1)
+                        tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1),
+                        unit: item.unit || 'pz' // ⚠️ QUESTO CAMPO MANCAVA!
                     }));
 
                     return from(
@@ -206,20 +205,20 @@ export class InvoiceService {
                             .from('invoice_items')
                             .insert(itemsToInsert)
                             .select(`
-                                *,
-                                products(
-                                    id,
-                                    name,
-                                    description,
-                                    category,
-                                    unit
-                                )
-                            `)
+                            *,
+                            products(
+                                id,
+                                name,
+                                description,
+                                category,
+                                unit
+                            )
+                        `)
                     ).pipe(
                         map(({ data: insertedItems, error: itemsError }) => {
                             if (itemsError) throw itemsError;
 
-                            this.loadInvoices(); // Ricarica tutte le fatture
+                            this.loadInvoices();
 
                             return {
                                 ...newInvoice,
@@ -270,7 +269,6 @@ export class InvoiceService {
             switchMap(({ data: updatedInvoice, error: invoiceError }) => {
                 if (invoiceError) throw invoiceError;
 
-                // Prima elimina tutti gli items esistenti
                 return from(
                     this.supabase.client
                         .from('invoice_items')
@@ -278,7 +276,6 @@ export class InvoiceService {
                         .eq('invoice_id', invoice.id)
                 ).pipe(
                     switchMap(() => {
-                        // Poi inserisci i nuovi items se presenti
                         if (invoice.items && invoice.items.length > 0) {
                             const itemsToInsert = invoice.items.map(item => ({
                                 invoice_id: updatedInvoice.id,
@@ -287,7 +284,8 @@ export class InvoiceService {
                                 total: this.utilityService.roundToDecimals(item.total),
                                 description: item.description.trim(),
                                 unit_price: this.utilityService.roundToDecimals(item.unit_price),
-                                tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1)
+                                tax_rate: this.utilityService.roundToDecimals(item.tax_rate, 1),
+                                unit: item.unit || 'pz' // ⚠️ ANCHE QUI MANCAVA!
                             }));
 
                             return from(
@@ -295,15 +293,15 @@ export class InvoiceService {
                                     .from('invoice_items')
                                     .insert(itemsToInsert)
                                     .select(`
-                                        *,
-                                        products(
-                                            id,
-                                            name,
-                                            description,
-                                            category,
-                                            unit
-                                        )
-                                    `)
+                                    *,
+                                    products(
+                                        id,
+                                        name,
+                                        description,
+                                        category,
+                                        unit
+                                    )
+                                `)
                             ).pipe(
                                 map(({ data: insertedItems, error: itemsError }) => {
                                     if (itemsError) throw itemsError;

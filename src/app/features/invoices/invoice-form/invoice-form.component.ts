@@ -71,6 +71,10 @@ export class InvoiceFormComponent implements OnInit {
   filteredCustomers!: Observable<Customer[]>;
   filteredProducts: Observable<Product[]>[] = [];
 
+  subtotal = signal(0);
+  taxAmount = signal(0);
+  total = signal(0);
+
   constructor() {
     this.invoiceForm = this.createForm();
   }
@@ -80,6 +84,9 @@ export class InvoiceFormComponent implements OnInit {
     this.setupCustomerFilter();
     this.checkEditMode();
     this.checkQueryParams();
+
+    this.setupTotalCalculations();
+
   }
 
   private loadData() {
@@ -112,10 +119,26 @@ export class InvoiceFormComponent implements OnInit {
     });
   }
 
-  private checkDataLoadingComplete() {
-    // Verifica se entrambi i dataset sono stati caricati
-    if (this.customers().length >= 0 && this.products().length >= 0) {
-      this.loading.set(false);
+  private setupCustomerFilter() {
+    this.filteredCustomers = this.invoiceForm.get('customer_search')!.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged(),
+      map(value => {
+        const name = typeof value === 'string' ? value : value?.name;
+        return name ? this._filterCustomers(name) : this.customers().slice();
+      })
+    );
+  }
+
+  private checkEditMode() {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id && id !== 'new') {
+      this.isEditMode.set(true);
+      this.currentInvoiceId.set(id);
+      this.loadInvoiceForEdit(id);
+    } else {
+      this.addItem(); // Add first item for new invoice
     }
   }
 
@@ -129,6 +152,118 @@ export class InvoiceFormComponent implements OnInit {
 
     if (duplicateId) {
       this.loadInvoiceForDuplication(duplicateId);
+    }
+  }
+
+  private setupTotalCalculations() {
+    // Sottoscrivi ai cambiamenti dell'intero FormArray
+    this.itemsFormArray.valueChanges.pipe(
+      debounceTime(100), // Evita calcoli troppo frequenti
+      distinctUntilChanged()
+    ).subscribe(() => {
+      console.log('FormArray changed, recalculating totals...');
+      this.calculateAllTotals();
+    });
+
+    // Calcola i totali iniziali
+    setTimeout(() => {
+      this.calculateAllTotals();
+    }, 100);
+  }
+
+  private calculateAllTotals() {
+    let newSubtotal = 0;
+    let newTaxAmount = 0;
+
+    // Calcola i totali da tutti gli items
+    this.itemsFormArray.controls.forEach((item, index) => {
+      const quantity = Number(item.get('quantity')?.value) || 0;
+      const unitPrice = Number(item.get('unit_price')?.value) || 0;
+      const taxRate = Number(item.get('tax_rate')?.value) || 0;
+
+      const itemSubtotal = quantity * unitPrice;
+      const itemTax = itemSubtotal * (taxRate / 100);
+
+      newSubtotal += itemSubtotal;
+      newTaxAmount += itemTax;
+
+      // Aggiorna anche il totale del singolo item
+      const itemTotal = itemSubtotal + itemTax;
+      item.get('total')?.setValue(itemTotal, { emitEvent: false });
+    });
+
+    const newTotal = newSubtotal + newTaxAmount;
+
+    // Aggiorna i signals
+    this.subtotal.set(newSubtotal);
+    this.taxAmount.set(newTaxAmount);
+    this.total.set(newTotal);
+
+    console.log('Totals calculated:', {
+      subtotal: newSubtotal,
+      taxAmount: newTaxAmount,
+      total: newTotal
+    });
+  }
+
+  getItemSubtotal(index: number): number {
+    if (index >= this.itemsFormArray.length) return 0;
+    const item = this.itemsFormArray.at(index);
+    const quantity = Number(item.get('quantity')?.value) || 0;
+    const unitPrice = Number(item.get('unit_price')?.value) || 0;
+    return quantity * unitPrice;
+  }
+
+  getItemTax(index: number): number {
+    if (index >= this.itemsFormArray.length) return 0;
+    const subtotal = this.getItemSubtotal(index);
+    const item = this.itemsFormArray.at(index);
+    const taxRate = Number(item.get('tax_rate')?.value) || 0;
+    return subtotal * (taxRate / 100);
+  }
+
+  getItemTotal(index: number): number {
+    return this.getItemSubtotal(index) + this.getItemTax(index);
+  }
+
+  areTotalsValid(): boolean {
+    if (this.itemsFormArray.length === 0) return true;
+    return this.total() > 0;
+  }
+
+  // Metodo per debug dei totali
+  debugTotals() {
+    console.log('=== DEBUG TOTALI ===');
+    console.log('Subtotal computed:', this.subtotal());
+    console.log('Tax computed:', this.taxAmount());
+    console.log('Total computed:', this.total());
+
+    this.itemsFormArray.controls.forEach((item, index) => {
+      console.log(`Item ${index}:`, {
+        quantity: item.get('quantity')?.value,
+        unitPrice: item.get('unit_price')?.value,
+        taxRate: item.get('tax_rate')?.value,
+        total: item.get('total')?.value,
+        calculated: this.getItemTotal(index)
+      });
+    });
+  }
+
+
+  private setupTotalCalculationEffect() {
+    // Monitora i cambiamenti nel form array
+    this.itemsFormArray.valueChanges.pipe(
+      debounceTime(100), // Evita calcoli troppo frequenti
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.triggerTotalRecalculation();
+    });
+  }
+
+  private checkDataLoadingComplete() {
+    // Verifica se entrambi i dataset sono stati caricati
+    if (this.customers().length >= 0 && this.products().length >= 0) {
+      this.loading.set(false);
     }
   }
 
@@ -190,18 +325,6 @@ export class InvoiceFormComponent implements OnInit {
     });
   }
 
-  private setupCustomerFilter() {
-    this.filteredCustomers = this.invoiceForm.get('customer_search')!.valueChanges.pipe(
-      startWith(''),
-      debounceTime(300),
-      distinctUntilChanged(),
-      map(value => {
-        const name = typeof value === 'string' ? value : value?.name;
-        return name ? this._filterCustomers(name) : this.customers().slice();
-      })
-    );
-  }
-
   private _filterCustomers(value: string): Customer[] {
     const filterValue = value.toLowerCase();
     return this.customers().filter(customer =>
@@ -236,17 +359,6 @@ export class InvoiceFormComponent implements OnInit {
       product.description?.toLowerCase().includes(filterValue) ||
       product.category?.toLowerCase().includes(filterValue)
     );
-  }
-
-  private checkEditMode() {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id && id !== 'new') {
-      this.isEditMode.set(true);
-      this.currentInvoiceId.set(id);
-      this.loadInvoiceForEdit(id);
-    } else {
-      this.addItem(); // Add first item for new invoice
-    }
   }
 
   private loadInvoiceForEdit(id: string) {
@@ -309,9 +421,12 @@ export class InvoiceFormComponent implements OnInit {
 
     this.itemsFormArray.push(itemForm);
     this.setupProductFilter(itemIndex);
-
-    // Setup reactive changes for calculations
     this.setupItemCalculations(itemIndex);
+
+    // AGGIUNTA: Forza il ricalcolo dopo l'aggiunta
+    setTimeout(() => {
+      this.calculateAllTotals();
+    }, 50);
   }
 
   addItemWithData(item: InvoiceItem) {
@@ -330,6 +445,22 @@ export class InvoiceFormComponent implements OnInit {
     this.itemsFormArray.push(itemForm);
     this.setupProductFilter(itemIndex);
     this.setupItemCalculations(itemIndex);
+
+    // AGGIUNTA: Forza il ricalcolo dopo l'aggiunta
+    setTimeout(() => {
+      this.calculateAllTotals();
+    }, 50);
+  }
+
+  removeItem(index: number) {
+    this.itemsFormArray.removeAt(index);
+    this.filteredProducts.splice(index, 1);
+
+    // AGGIUNTA: Ricalcola i totali dopo la rimozione
+    setTimeout(() => {
+      this.calculateAllTotals();
+    }, 50);
+
   }
 
   private setupItemCalculations(index: number) {
@@ -337,8 +468,15 @@ export class InvoiceFormComponent implements OnInit {
 
     // Listen to changes in quantity, unit_price, or tax_rate
     ['quantity', 'unit_price', 'tax_rate'].forEach(field => {
-      item.get(field)?.valueChanges.subscribe(() => {
+      item.get(field)?.valueChanges.pipe(
+        debounceTime(50)
+      ).subscribe((value) => {
+        console.log(`Item ${index} ${field} changed to:`, value);
         this.calculateItemTotal(index);
+        // Forza il ricalcolo generale dopo un breve delay
+        setTimeout(() => {
+          this.calculateAllTotals();
+        }, 10);
       });
     });
 
@@ -346,10 +484,34 @@ export class InvoiceFormComponent implements OnInit {
     this.calculateItemTotal(index);
   }
 
-  removeItem(index: number) {
-    this.itemsFormArray.removeAt(index);
-    this.filteredProducts.splice(index, 1);
-    this.calculateTotals();
+  calculateItemTotal(index: number) {
+    const item = this.itemsFormArray.at(index);
+    const quantity = Number(item.get('quantity')?.value) || 0;
+    const unitPrice = Number(item.get('unit_price')?.value) || 0;
+    const taxRate = Number(item.get('tax_rate')?.value) || 0;
+
+    const subtotal = quantity * unitPrice;
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
+
+    console.log(`Item ${index} calculation:`, {
+      quantity, unitPrice, taxRate, subtotal, tax, total
+    });
+
+    item.get('total')?.setValue(total, { emitEvent: false });
+
+    // NON chiamare calculateAllTotals qui per evitare loop infiniti
+    // Verrà chiamato dal listener valueChanges
+  }
+
+  private triggerTotalRecalculation() {
+    // Forza l'aggiornamento del form per triggherare i computed
+    this.invoiceForm.updateValueAndValidity({ emitEvent: false });
+
+    // Alternativa: Usa effect per reagire ai cambiamenti
+    setTimeout(() => {
+      this.calculateTotals();
+    }, 0);
   }
 
   onProductSelected(event: any, index: number) {
@@ -365,50 +527,19 @@ export class InvoiceFormComponent implements OnInit {
       unit: product.unit || 'pz'
     });
 
-    // Ricalcola il totale
-    this.calculateItemTotal(index);
+    // AGGIUNTA: Forza il ricalcolo dopo la selezione prodotto
+    setTimeout(() => {
+      this.calculateItemTotal(index);
+      this.calculateAllTotals();
+    }, 50);
   }
 
-  calculateItemTotal(index: number) {
-    const item = this.itemsFormArray.at(index);
-    const quantity = Number(item.get('quantity')?.value) || 0;
-    const unitPrice = Number(item.get('unit_price')?.value) || 0;
-    const taxRate = Number(item.get('tax_rate')?.value) || 0;
-
-    const subtotal = quantity * unitPrice;
-    const tax = subtotal * (taxRate / 100);
-    const total = subtotal + tax;
-
-    item.get('total')?.setValue(total, { emitEvent: false });
-    this.calculateTotals();
-  }
 
   private calculateTotals() {
-    // Force recalculation of computed signals
-    this.invoiceForm.updateValueAndValidity();
+    // Non fare nulla qui - lascia che i computed si aggiornino automaticamente
+    // Oppure emetti un evento per forzare il change detection
+    this.invoiceForm.markAsDirty();
   }
-
-  subtotal = computed(() => {
-    return this.itemsFormArray.controls.reduce((sum, item) => {
-      const quantity = Number(item.get('quantity')?.value) || 0;
-      const unitPrice = Number(item.get('unit_price')?.value) || 0;
-      return sum + (quantity * unitPrice);
-    }, 0);
-  });
-
-  taxAmount = computed(() => {
-    return this.itemsFormArray.controls.reduce((sum, item) => {
-      const quantity = Number(item.get('quantity')?.value) || 0;
-      const unitPrice = Number(item.get('unit_price')?.value) || 0;
-      const taxRate = Number(item.get('tax_rate')?.value) || 0;
-      const subtotal = quantity * unitPrice;
-      return sum + (subtotal * (taxRate / 100));
-    }, 0);
-  });
-
-  total = computed(() => {
-    return this.subtotal() + this.taxAmount();
-  });
 
   displayCustomer(customer: Customer): string {
     return customer && customer.name ? customer.name : '';
@@ -473,6 +604,7 @@ export class InvoiceFormComponent implements OnInit {
   }
 
   saveInvoice() {
+
     if (this.invoiceForm.invalid) {
       this.markFormGroupTouched(this.invoiceForm);
       this.snackBar.open('Completa tutti i campi obbligatori', 'Chiudi', { duration: 3000 });
@@ -503,16 +635,28 @@ export class InvoiceFormComponent implements OnInit {
 
     const formValue = this.invoiceForm.value;
 
+    // 🔍 DEBUG: Aggiungi log per verificare i dati degli items
+    console.log('Form items before processing:', formValue.items);
+
     // Prepara gli items pulendo i dati non necessari
-    const items: InvoiceItem[] = formValue.items.map((item: any) => ({
-      product_id: item.product_id || null, // null se non è collegato a un prodotto
-      description: item.description.trim(),
-      quantity: Number(item.quantity),
-      unit_price: Number(item.unit_price),
-      tax_rate: Number(item.tax_rate),
-      total: Number(item.total),
-      unit: item.unit || 'pz'
-    }));
+    const items: InvoiceItem[] = formValue.items.map((item: any, index: number) => {
+      const processedItem = {
+        product_id: item.product_id || null,
+        description: item.description?.trim() || '',
+        quantity: Number(item.quantity) || 0,
+        unit_price: Number(item.unit_price) || 0,
+        tax_rate: Number(item.tax_rate) || 22,
+        total: Number(item.total) || 0,
+        unit: item.unit || 'pz'
+      };
+
+      // 🔍 DEBUG: Log ogni item processato
+      console.log(`Item ${index + 1}:`, processedItem);
+
+      return processedItem;
+    });
+
+    console.log('Final processed items:', items);
 
     const invoiceData: Omit<Invoice, 'id' | 'created_at'> = {
       invoice_number: formValue.invoice_number,
@@ -526,6 +670,8 @@ export class InvoiceFormComponent implements OnInit {
       notes: formValue.notes?.trim() || undefined,
       items: items
     };
+
+    console.log('Final invoice data:', invoiceData);
 
     const operation$ = this.isEditMode() && this.currentInvoiceId()
       ? this.invoiceService.updateInvoice({ ...invoiceData, id: this.currentInvoiceId()! } as Invoice)

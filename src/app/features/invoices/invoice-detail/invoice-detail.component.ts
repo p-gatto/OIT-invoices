@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
@@ -66,6 +66,17 @@ export class InvoiceDetailComponent implements OnInit {
       next: (invoice) => {
         if (invoice) {
           this.invoice.set(invoice);
+
+          // AGGIUNTA: Verifica l'integrità dei totali
+          setTimeout(() => {
+            if (!this.verifyTotalIntegrity()) {
+              this.snackBar.open(
+                'I totali della fattura potrebbero non essere aggiornati',
+                'Ricalcola',
+                { duration: 5000 }
+              );
+            }
+          }, 100);
         } else {
           this.snackBar.open('Fattura non trovata', 'Chiudi', { duration: 3000 });
           this.router.navigate(['/invoices']);
@@ -80,6 +91,54 @@ export class InvoiceDetailComponent implements OnInit {
       }
     });
   }
+
+  calculatedSubtotal = computed(() => {
+    const invoice = this.invoice();
+    if (!invoice?.items) return 0;
+
+    return invoice.items.reduce((sum, item) =>
+      sum + (item.quantity * item.unit_price), 0);
+  });
+
+  calculatedTaxAmount = computed(() => {
+    const invoice = this.invoice();
+    if (!invoice?.items) return 0;
+
+    return invoice.items.reduce((sum, item) => {
+      const subtotal = item.quantity * item.unit_price;
+      return sum + (subtotal * (item.tax_rate / 100));
+    }, 0);
+  });
+
+  calculatedTotal = computed(() => {
+    return this.calculatedSubtotal() + this.calculatedTaxAmount();
+  });
+
+  private verifyTotalIntegrity(): boolean {
+    const invoice = this.invoice();
+    if (!invoice) return false;
+
+    const calcSubtotal = this.calculatedSubtotal();
+    const calcTaxAmount = this.calculatedTaxAmount();
+    const calcTotal = this.calculatedTotal();
+
+    const tolerance = 0.01; // 1 centesimo di tolleranza
+
+    const subtotalMatch = Math.abs(invoice.subtotal - calcSubtotal) <= tolerance;
+    const taxMatch = Math.abs(invoice.tax_amount - calcTaxAmount) <= tolerance;
+    const totalMatch = Math.abs(invoice.total - calcTotal) <= tolerance;
+
+    if (!subtotalMatch || !taxMatch || !totalMatch) {
+      console.warn('Invoice total mismatch detected:', {
+        stored: { subtotal: invoice.subtotal, tax: invoice.tax_amount, total: invoice.total },
+        calculated: { subtotal: calcSubtotal, tax: calcTaxAmount, total: calcTotal }
+      });
+      return false;
+    }
+
+    return true;
+  }
+
 
   getDaysToDeadline(): number {
     const invoice = this.invoice();

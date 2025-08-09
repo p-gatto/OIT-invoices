@@ -124,15 +124,29 @@ export class InvoicesComponent implements OnInit {
   // Computed per statistiche rapide
   invoiceStats = computed(() => {
     const filtered = this.filteredInvoices();
-    const total = filtered.reduce((sum, inv) => sum + inv.total, 0);
+
+    // Calcola i totali correttamente
+    const total = filtered.reduce((sum, inv) => {
+      // Assicurati che inv.total sia un numero
+      const invoiceTotal = Number(inv.total) || 0;
+      return sum + invoiceTotal;
+    }, 0);
+
     const pending = filtered.filter(inv => inv.status === 'sent').length;
-    const overdue = filtered.filter(inv =>
-      inv.status === 'sent' && inv.due_date && new Date(inv.due_date) < new Date()
-    ).length;
+
+    // Migliora il calcolo delle fatture scadute
+    const overdue = filtered.filter(inv => {
+      if (inv.status !== 'sent' || !inv.due_date) return false;
+      const dueDate = new Date(inv.due_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    }).length;
 
     return {
       count: filtered.length,
-      total,
+      total: Math.round(total * 100) / 100, // Arrotonda a 2 decimali
       pending,
       overdue
     };
@@ -165,7 +179,15 @@ export class InvoicesComponent implements OnInit {
     this.loading.set(true);
     this.invoiceService.getInvoices().subscribe({
       next: invoices => {
-        this.invoices.set(invoices);
+        // AGGIUNTA: Verifica che tutti i totali siano numerici
+        const validatedInvoices = invoices.map(invoice => ({
+          ...invoice,
+          subtotal: Number(invoice.subtotal) || 0,
+          tax_amount: Number(invoice.tax_amount) || 0,
+          total: Number(invoice.total) || 0
+        }));
+
+        this.invoices.set(validatedInvoices);
         this.loading.set(false);
       },
       error: err => {
@@ -174,6 +196,11 @@ export class InvoicesComponent implements OnInit {
         console.error('Failed to load invoices:', err);
       }
     });
+  }
+
+  refreshStats() {
+    // Forza il ricalcolo triggherando il computed
+    this.loadInvoices();
   }
 
   /**
