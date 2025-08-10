@@ -100,22 +100,22 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Quick Actions -->
         <mat-card class="surface-container">
-            <mat-card-header>
+            <mat-card-header class="mt-2">
                 <mat-card-title class="text-on-surface">Azioni rapide</mat-card-title>
             </mat-card-header>
-            <mat-card-content class="p-6">
+            <mat-card-content class="p-6 mt-4">
                 <div class="grid grid-cols-2 gap-4">
                     <button mat-raised-button color="primary" (click)="createNewInvoice()" class="h-16 flex-col">
                         <mat-icon>add</mat-icon>
                         <span class="mt-1 text-sm">Nuova Fattura</span>
                     </button>
 
-                    <button mat-outlined-button (click)="goToCustomers()" class="h-16 flex-col">
+                    <button mat-button (click)="goToCustomers()" class="h-16 flex-col">
                         <mat-icon>person_add</mat-icon>
                         <span class="mt-1 text-sm">Gestisci Clienti</span>
                     </button>
 
-                    <button mat-outlined-button (click)="goToPendingInvoices()" class="h-16 flex-col">
+                    <button mat-button (click)="goToPendingInvoices()" class="h-16 flex-col mt-10">
                         <mat-icon>schedule</mat-icon>
                         <span class="mt-1 text-sm">In Attesa</span>
                         @if (stats().pendingInvoices > 0) {
@@ -124,7 +124,7 @@
                         }
                     </button>
 
-                    <button mat-outlined-button routerLink="/reports" class="h-16 flex-col">
+                    <button mat-button routerLink="/reports" class="h-16 flex-col mt-10">
                         <mat-icon>analytics</mat-icon>
                         <span class="mt-1 text-sm">Report</span>
                     </button>
@@ -198,7 +198,7 @@
             <mat-card-header>
                 <mat-card-title class="text-on-surface">Questo Mese</mat-card-title>
             </mat-card-header>
-            <mat-card-content class="p-6">
+            <mat-card-content class="p-6 mt-4">
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <span class="text-on-surface-variant">Fatturato:</span>
@@ -232,7 +232,7 @@
             <mat-card-header>
                 <mat-card-title class="text-on-surface">Andamento</mat-card-title>
             </mat-card-header>
-            <mat-card-content class="p-6">
+            <mat-card-content class="p-6 mt-4">
                 <div class="space-y-4">
                     @if (stats().totalRevenue > 0) {
                     <div>
@@ -268,7 +268,7 @@
             <mat-card-header>
                 <mat-card-title class="text-on-surface">Accesso Rapido</mat-card-title>
             </mat-card-header>
-            <mat-card-content class="p-6">
+            <mat-card-content class="p-6 mt-4">
                 <div class="space-y-3">
                     <button mat-stroked-button class="w-full justify-start" routerLink="/products">
                         <mat-icon>inventory_2</mat-icon>
@@ -277,10 +277,6 @@
                     <button mat-stroked-button class="w-full justify-start" (click)="goToCustomers()">
                         <mat-icon>people</mat-icon>
                         <span class="ml-2">Gestisci Clienti</span>
-                    </button>
-                    <button mat-stroked-button class="w-full justify-start" routerLink="/settings">
-                        <mat-icon>settings</mat-icon>
-                        <span class="ml-2">Impostazioni</span>
                     </button>
                     <button mat-stroked-button class="w-full justify-start" routerLink="/help">
                         <mat-icon>help</mat-icon>

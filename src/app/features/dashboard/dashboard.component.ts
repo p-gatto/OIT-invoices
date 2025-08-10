@@ -58,6 +58,9 @@ export class DashboardComponent implements OnInit {
     // Carica fatture
     this.invoiceService.getInvoices().subscribe({
       next: invoices => {
+        console.log('📊 Dashboard - Fatture caricate:', invoices.length);
+        console.log('📊 Dashboard - Prima fattura esempio:', invoices[0]);
+
         // Prendi le ultime 5 fatture per la sezione recenti
         this.recentInvoices.set(invoices.slice(0, 5));
         this.calculateInvoiceStats(invoices);
@@ -88,42 +91,74 @@ export class DashboardComponent implements OnInit {
   }
 
   private calculateInvoiceStats(invoices: Invoice[]) {
+    console.log('🧮 Dashboard - Inizio calcolo statistiche...');
+
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    // Calcola revenue totale (solo fatture pagate)
+    // 🔧 FIX 1: Calcola revenue totale da TUTTE le fatture (non solo quelle pagate)
+    // Considera 'paid' e 'sent' come fatture valide per il fatturato
     const totalRevenue = invoices
-      .filter(inv => inv.status === 'paid')
-      .reduce((sum, inv) => sum + inv.total, 0);
+      .filter(inv => {
+        const isValidStatus = ['paid', 'sent'].includes(inv.status);
+        console.log(`Fattura ${inv.invoice_number}: status=${inv.status}, valid=${isValidStatus}, total=${inv.total}`);
+        return isValidStatus;
+      })
+      .reduce((sum, inv) => {
+        const total = Number(inv.total) || 0;
+        console.log(`Aggiungendo ${total} al totale (era ${sum})`);
+        return sum + total;
+      }, 0);
 
-    // Calcola fatture in attesa
+    console.log('💰 Revenue totale calcolato:', totalRevenue);
+
+    // Calcola fatture in attesa (solo 'sent')
     const pendingInvoices = invoices.filter(inv => inv.status === 'sent').length;
 
-    // Calcola fatture scadute
+    // 🔧 FIX 2: Migliora il calcolo delle fatture scadute
     const overdueInvoices = invoices.filter(inv => {
       if (inv.status !== 'sent' || !inv.due_date) return false;
-      return new Date(inv.due_date) < today;
+
+      const dueDate = new Date(inv.due_date);
+      const todayReset = new Date();
+      todayReset.setHours(0, 0, 0, 0);
+      dueDate.setHours(0, 0, 0, 0);
+
+      const isOverdue = dueDate < todayReset;
+      console.log(`Fattura ${inv.invoice_number}: due=${inv.due_date}, overdue=${isOverdue}`);
+      return isOverdue;
     }).length;
 
-    // Calcola revenue del mese corrente
+    // 🔧 FIX 3: Revenue del mese corrente più flessibile
     const thisMonthRevenue = invoices
       .filter(inv => {
         const invoiceDate = new Date(inv.issue_date);
-        return inv.status === 'paid' &&
-          invoiceDate.getMonth() === currentMonth &&
+        const isValidStatus = ['paid', 'sent'].includes(inv.status);
+        const isThisMonth = invoiceDate.getMonth() === currentMonth &&
           invoiceDate.getFullYear() === currentYear;
-      })
-      .reduce((sum, inv) => sum + inv.total, 0);
 
-    this.stats.set({
+        console.log(`Fattura ${inv.invoice_number}: date=${inv.issue_date}, thisMonth=${isThisMonth}, status=${inv.status}`);
+        return isValidStatus && isThisMonth;
+      })
+      .reduce((sum, inv) => {
+        const total = Number(inv.total) || 0;
+        return sum + total;
+      }, 0);
+
+    console.log('📅 Revenue questo mese:', thisMonthRevenue);
+
+    const newStats = {
       totalInvoices: invoices.length,
-      totalRevenue,
+      totalRevenue: Math.round(totalRevenue * 100) / 100, // Arrotonda a 2 decimali
       pendingInvoices,
       overdueInvoices,
       totalCustomers: 0, // Verrà aggiornato da loadCustomerStats()
-      thisMonthRevenue
-    });
+      thisMonthRevenue: Math.round(thisMonthRevenue * 100) / 100
+    };
+
+    console.log('📊 Statistiche finali:', newStats);
+    this.stats.set(newStats);
   }
 
   getStatusLabel(status: string): string {
@@ -199,17 +234,18 @@ export class DashboardComponent implements OnInit {
 
   createNewCustomer() {
     this.router.navigate(['/customers']);
-    // Trigger new customer dialog (this would need to be implemented in the customers component)
   }
 
-  // Calcola la crescita percentuale mensile (placeholder per logica futura)
+  // 🔧 FIX 4: Metodo migliorato per calcolare crescita mensile
   calculateMonthlyGrowth(): number {
-    // Logica semplificata - in futuro si potrebbe confrontare con il mese precedente
     const thisMonth = this.stats().thisMonthRevenue;
     const total = this.stats().totalRevenue;
 
     if (total === 0) return 0;
-    return (thisMonth / total) * 100;
+
+    // Calcola la percentuale del fatturato mensile rispetto al totale
+    const percentage = (thisMonth / total) * 100;
+    return Math.round(percentage * 10) / 10; // Arrotonda a 1 decimale
   }
 
   // Calcola la percentuale di fatture pagate
@@ -217,8 +253,9 @@ export class DashboardComponent implements OnInit {
     const total = this.stats().totalInvoices;
     if (total === 0) return 0;
 
-    const paidCount = total - this.stats().pendingInvoices - this.stats().overdueInvoices;
-    return (paidCount / total) * 100;
+    // Considera sia 'paid' che 'sent' come "processate" vs 'draft'
+    const processedCount = total - this.countDraftInvoices();
+    return Math.round((processedCount / total) * 100);
   }
 
   // Calcola la percentuale di fatture in attesa
@@ -226,7 +263,33 @@ export class DashboardComponent implements OnInit {
     const total = this.stats().totalInvoices;
     if (total === 0) return 0;
 
-    return (this.stats().pendingInvoices / total) * 100;
+    return Math.round((this.stats().pendingInvoices / total) * 100);
+  }
+
+  // 🔧 FIX 5: Metodo helper per contare le bozze
+  private countDraftInvoices(): number {
+    // Se hai accesso alle fatture, conta quelle con status 'draft'
+    const recent = this.recentInvoices();
+    return recent.filter(inv => inv.status === 'draft').length;
+  }
+
+  // 🔧 FIX 6: Metodi di debug per troubleshooting
+  debugStats() {
+    console.group('🐛 DEBUG Dashboard Stats');
+    console.log('Current stats:', this.stats());
+    console.log('Recent invoices:', this.recentInvoices());
+
+    // Analizza ogni fattura recente
+    this.recentInvoices().forEach((inv, index) => {
+      console.log(`Invoice ${index + 1}:`, {
+        number: inv.invoice_number,
+        status: inv.status,
+        total: inv.total,
+        totalType: typeof inv.total,
+        totalNumber: Number(inv.total)
+      });
+    });
+    console.groupEnd();
   }
 
 }
