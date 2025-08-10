@@ -78,28 +78,6 @@
       </div>
       }
 
-      <!-- Statistiche Clienti -->
-      <!-- <div class="flex items-center justify-between">
-        <span>Clienti:</span>
-        <span class="font-medium text-on-surface">
-          {{ activeCustomersCount() }}
-          @if (totalCustomersCount() > activeCustomersCount()) {
-          <span class="text-on-surface-variant">/{{ totalCustomersCount() }}</span>
-          }
-        </span>
-      </div> -->
-
-      <!-- Statistiche Prodotti -->
-      <!-- <div class="flex items-center justify-between">
-        <span>Prodotti:</span>
-        <span class="font-medium text-on-surface">
-          {{ activeProductsCount() }}
-          @if (totalProductsCount() > activeProductsCount()) {
-          <span class="text-on-surface-variant">/{{ totalProductsCount() }}</span>
-          }
-        </span>
-      </div> -->
-
       <!-- Avviso prodotti a basso stock -->
       @if (lowStockProductsCount() > 0) {
       <div class="low-stock-alert" (click)="router.navigate(['/products'])" matTooltip="Click per andare ai prodotti"

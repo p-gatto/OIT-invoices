@@ -219,23 +219,6 @@ export class SidebarNotificationService {
     }
 
     /**
-     * Sottoscrivi a cambiamenti delle notifiche per una route specifica
-     */
-    /* subscribeToRouteNotifications(route: string, callback: (notification: SidebarBadgeData | null) => void) {
-        // Implementa la logica di sottoscrizione basata sulla route
-        switch (route) {
-            case '/invoices':
-                return this.invoiceNotifications.subscribe(callback);
-            case '/customers':
-                return this.customerNotifications.subscribe(callback);
-            case '/products':
-                return this.productNotifications.subscribe(callback);
-            default:
-                callback(null);
-        }
-    } */
-
-    /**
      * Statistiche generali per debug/monitoraggio
      */
     getStats() {
