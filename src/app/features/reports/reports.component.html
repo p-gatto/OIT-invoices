@@ -1,22 +1,36 @@
-<div class="page-container animate-fade-in">
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-on-surface mb-2">Report</h1>
-        <p class="text-on-surface-variant">Analisi e statistiche delle tue fatture</p>
-    </div>
+<div class="filters">
+    <label>
+        <input type="radio" name="filter" value="month" [(ngModel)]="selectedFilter" (change)="loadData()"> Mese
+        corrente
+    </label>
+    <label>
+        <input type="radio" name="filter" value="last30" [(ngModel)]="selectedFilter" (change)="loadData()"> Ultimi 30
+        giorni
+    </label>
+    <label>
+        <input type="radio" name="filter" value="custom" [(ngModel)]="selectedFilter" (change)="loadData()">
+        Personalizzato
+    </label>
 
-    <mat-card class="surface-container">
-        <mat-card-content class="text-center py-16">
-            <mat-icon class="text-8xl text-on-surface-variant mb-4">analytics</mat-icon>
-            <h3 class="text-xl font-semibold text-on-surface mb-4">
-                Sezione Report
-            </h3>
-            <p class="text-on-surface-variant mb-6">
-                Grafici e analisi saranno disponibili nelle prossime versioni
-            </p>
-            <button mat-raised-button color="primary" disabled>
-                <mat-icon>bar_chart</mat-icon>
-                Genera Report
-            </button>
-        </mat-card-content>
-    </mat-card>
+    <div *ngIf="selectedFilter === 'custom'">
+        <input type="date" [(ngModel)]="customFrom" (change)="loadData()">
+        <input type="date" [(ngModel)]="customTo" (change)="loadData()">
+    </div>
+</div>
+
+<div class="stat-card">
+    <h3>Totale Fatturato</h3>
+    <p>{{ totalRevenue | currency:'EUR' }}</p>
+    <small *ngIf="prevPeriodRevenue">Periodo precedente: {{ prevPeriodRevenue | currency:'EUR' }}</small>
+</div>
+
+<div class="stat-card dim-graph">
+    <h3>Fatture per Stato</h3>
+    <canvas baseChart [data]="pieChartData" [options]="pieChartOptions" type="pie">
+    </canvas>
+</div>
+
+<div class="stat-card">
+    <h3>Clienti Attivi</h3>
+    <p>{{ activeCustomers }}</p>
 </div>
