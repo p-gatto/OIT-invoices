@@ -29,6 +29,37 @@ export class InvoiceService {
         this.loadCustomers();
     }
 
+    async getTotalRevenue(dateFrom?: Date, dateTo?: Date): Promise<number> {
+        let query = this.supabase.client.from('invoices').select('total');
+
+        if (dateFrom && dateTo) {
+            query = query.gte('issue_date', dateFrom.toISOString()).lte('issue_date', dateTo.toISOString());
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return (data ?? []).reduce((sum: number, r: any) => sum + Number(r.total ?? 0), 0);
+    }
+
+    async getInvoiceCountByStatus(dateFrom?: Date, dateTo?: Date): Promise<{ status: string; count: number }[]> {
+        let query = this.supabase.client.from('invoices').select('status');
+
+        if (dateFrom && dateTo) {
+            query = query.gte('issue_date', dateFrom.toISOString()).lte('issue_date', dateTo.toISOString());
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const counts = (data ?? []).reduce((acc, inv) => {
+            acc[inv.status] = (acc[inv.status] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(counts).map(([status, count]) => ({ status, count }));
+    }
+
     // CRUD Operazioni per Fatture
     getInvoices(): Observable<Invoice[]> {
         return from(

@@ -37,6 +37,15 @@ export class CustomerService {
     this.getCustomers().subscribe();
   }
 
+  async getActiveCustomerCount(): Promise<number> {
+    const { count, error } = await this.supabase.client
+      .from('customers')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+    if (error) throw error;
+    return count ?? 0;
+  }
+
   getCustomerById(id: string): Observable<Customer | null> {
     return from(
       this.supabase.client
