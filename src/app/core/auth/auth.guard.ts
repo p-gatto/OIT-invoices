@@ -26,7 +26,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     take(1), // Completa l'Observable dopo il primo valore
     tap(isAuthenticated => {
       if (!isAuthenticated) {
-        console.log('User not authenticated, redirecting to login...');
+        //console.log('User not authenticated, redirecting to login...');
         router.navigate(['/login']);
       }
     }),

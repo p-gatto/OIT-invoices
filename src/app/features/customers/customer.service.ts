@@ -219,14 +219,14 @@ export class CustomerService {
     ).pipe(
       map(({ data, error }) => {
         if (error && error.code === 'PGRST116') {
-          console.log('👻 Cliente non trovato nel database:', id);
+          //console.log('👻 Cliente non trovato nel database:', id);
           return false;
         }
         if (error) {
           console.error('❌ Errore verifica esistenza cliente:', error);
           throw error;
         }
-        console.log('✅ Cliente trovato nel database:', data);
+        //console.log('✅ Cliente trovato nel database:', data);
         return true;
       })
     );

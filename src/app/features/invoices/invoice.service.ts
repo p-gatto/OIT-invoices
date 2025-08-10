@@ -82,7 +82,7 @@ export class InvoiceService {
             switchMap(({ data: invoicesData, error: invoicesError }) => {
                 if (invoicesError) throw invoicesError;
 
-                console.log('🔍 Service - Raw invoices from DB:', invoicesData?.length || 0);
+                //console.log('🔍 Service - Raw invoices from DB:', invoicesData?.length || 0);
 
                 // Per ogni fattura, carica gli items separatamente
                 const invoicesWithItems$ = (invoicesData || []).map(invoice =>
@@ -114,13 +114,13 @@ export class InvoiceService {
                                 items: itemsData || []
                             });
 
-                            console.log(`📋 Invoice ${normalizedInvoice.invoice_number}:`, {
-                                subtotal: normalizedInvoice.subtotal,
-                                tax_amount: normalizedInvoice.tax_amount,
-                                total: normalizedInvoice.total,
-                                status: normalizedInvoice.status
-                            });
-
+                            /*   console.log(`📋 Invoice ${normalizedInvoice.invoice_number}:`, {
+                                  subtotal: normalizedInvoice.subtotal,
+                                  tax_amount: normalizedInvoice.tax_amount,
+                                  total: normalizedInvoice.total,
+                                  status: normalizedInvoice.status
+                              });
+   */
                             return normalizedInvoice as Invoice;
                         })
                     )
@@ -134,11 +134,11 @@ export class InvoiceService {
                 return forkJoin(invoicesWithItems$);
             }),
             map((invoices: Invoice[]) => {
-                console.log('✅ Service - Processed invoices:', invoices.length);
+                //console.log('✅ Service - Processed invoices:', invoices.length);
 
                 // Calcola totali di debug
                 const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-                console.log('💰 Service - Total revenue calculated:', totalRevenue);
+                //console.log('💰 Service - Total revenue calculated:', totalRevenue);
 
                 this.invoicesSignal.set(invoices);
                 return invoices;
@@ -194,7 +194,7 @@ export class InvoiceService {
     }> {
         return this.getInvoices().pipe(
             map(invoices => {
-                console.group('📊 InvoiceService - Calcolo statistiche');
+                //console.group('📊 InvoiceService - Calcolo statistiche');
 
                 const today = new Date();
                 const currentMonth = today.getMonth();
@@ -253,7 +253,7 @@ export class InvoiceService {
                         thisMonthRevenue += total;
                     }
 
-                    console.log(`${inv.invoice_number}: ${finalStatus}, €${total}`);
+                    //console.log(`${inv.invoice_number}: ${finalStatus}, €${total}`);
                     return { ...inv, finalStatus, total };
                 });
 
@@ -268,39 +268,13 @@ export class InvoiceService {
                     thisMonthRevenue: Math.round(thisMonthRevenue * 100) / 100
                 };
 
-                console.log('📊 Final stats:', stats);
-                console.groupEnd();
+                //console.log('📊 Final stats:', stats);
+                //console.groupEnd();
 
                 return stats;
             })
         );
     }
-
-    // 🔧 Metodo di debug per verificare i dati
-    /* debugInvoiceData(): void {
-        this.getInvoices().pipe(take(1)).subscribe(invoices=> {
-            console.group('🐛 DEBUG Invoice Data');
-
-            console.log(`Total invoices loaded: ${invoices.length}`);
-
-            invoices.forEach((invoice, index) => {
-                console.log(`Invoice ${index + 1}:`, {
-                    number: invoice.invoice_number,
-                    status: invoice.status,
-                    subtotal: invoice.subtotal,
-                    tax_amount: invoice.tax_amount,
-                    total: invoice.total,
-                    items_count: invoice.items?.length || 0,
-                    customer: invoice.customer?.name || 'No customer'
-                });
-            });
-
-            const totalSum = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-            console.log(`Total revenue sum: €${totalSum}`);
-
-            console.groupEnd();
-        });
-    } */
 
     getInvoiceById(id: string): Observable<Invoice | null> {
         return from(
@@ -459,16 +433,16 @@ export class InvoiceService {
             updated_at: new Date().toISOString()
         };
 
-        console.log('🔄 ================================');
-        console.log('🔄 STARTING UPDATE INVOICE:', invoice.id);
-        console.log('🔄 Items from form:', invoice.items?.length || 0);
-        console.log('🔄 ================================');
+        //console.log('🔄 ================================');
+        //console.log('🔄 STARTING UPDATE INVOICE:', invoice.id);
+        //console.log('🔄 Items from form:', invoice.items?.length || 0);
+        //console.log('🔄 ================================');
 
         // STEP 1: Debug stato iniziale
         return from(this.debugInvoiceItems(invoice.id!)).pipe(
             switchMap(() => {
                 // STEP 2: Aggiorna la fattura
-                console.log('📝 Step 1: Updating invoice record...');
+                //console.log('📝 Step 1: Updating invoice record...');
                 return from(
                     this.supabase.client
                         .from('invoices')
@@ -480,13 +454,13 @@ export class InvoiceService {
             }),
             switchMap(({ data: updatedInvoice, error: invoiceError }) => {
                 if (invoiceError) throw invoiceError;
-                console.log('✅ Step 1 completed: Invoice record updated');
+                //console.log('✅ Step 1 completed: Invoice record updated');
 
                 // STEP 3: Debug prima della cancellazione
                 return from(this.debugInvoiceItems(invoice.id!)).pipe(
                     switchMap(() => {
                         // STEP 4: Cancella items esistenti
-                        console.log('🗑️ Step 2: Deleting existing items...');
+                        //console.log('🗑️ Step 2: Deleting existing items...');
                         return from(
                             this.supabase.client
                                 .from('invoice_items')
@@ -501,7 +475,7 @@ export class InvoiceService {
                             throw deleteError;
                         }
 
-                        console.log('✅ Step 2 completed: Deleted', deletedItems?.length || 0, 'items');
+                        //console.log('✅ Step 2 completed: Deleted', deletedItems?.length || 0, 'items');
                         deletedItems?.forEach((item, index) => {
                             console.log(`   Deleted item ${index + 1}: ${item.description}`);
                         });
@@ -512,7 +486,7 @@ export class InvoiceService {
                     switchMap(() => {
                         // STEP 6: Inserisci nuovi items
                         if (invoice.items && invoice.items.length > 0) {
-                            console.log('💾 Step 3: Inserting', invoice.items.length, 'new items...');
+                            //console.log('💾 Step 3: Inserting', invoice.items.length, 'new items...');
 
                             const itemsToInsert = invoice.items.map((item, index) => {
                                 const cleanItem = {
@@ -526,11 +500,11 @@ export class InvoiceService {
                                     unit: item.unit || 'pz'
                                 };
 
-                                console.log(`📦 Preparing item ${index + 1}:`, {
-                                    description: cleanItem.description,
-                                    quantity: cleanItem.quantity,
-                                    unit_price: cleanItem.unit_price
-                                });
+                                /*    console.log(`📦 Preparing item ${index + 1}:`, {
+                                       description: cleanItem.description,
+                                       quantity: cleanItem.quantity,
+                                       unit_price: cleanItem.unit_price
+                                   }); */
 
                                 return cleanItem;
                             });
@@ -556,13 +530,13 @@ export class InvoiceService {
                                         throw itemsError;
                                     }
 
-                                    console.log('✅ Step 3 completed: Inserted', insertedItems?.length || 0, 'items');
+                                    //console.log('✅ Step 3 completed: Inserted', insertedItems?.length || 0, 'items');
                                     insertedItems?.forEach((item, index) => {
-                                        console.log(`   Inserted item ${index + 1}:`, {
-                                            id: item.id,
-                                            description: item.description,
-                                            created_at: item.created_at
-                                        });
+                                        /*    console.log(`   Inserted item ${index + 1}:`, {
+                                               id: item.id,
+                                               description: item.description,
+                                               created_at: item.created_at
+                                           }); */
                                     });
 
                                     // STEP 7: Debug finale
@@ -570,8 +544,8 @@ export class InvoiceService {
                                         map(() => {
                                             this.loadInvoices();
 
-                                            console.log('🎉 UPDATE COMPLETED SUCCESSFULLY');
-                                            console.log('🎉 ================================');
+                                            //console.log('🎉 UPDATE COMPLETED SUCCESSFULLY');
+                                            //console.log('🎉 ================================');
 
                                             return {
                                                 ...updatedInvoice,
@@ -583,7 +557,7 @@ export class InvoiceService {
                                 })
                             );
                         } else {
-                            console.log('ℹ️ Step 3: No items to insert');
+                            //console.log('ℹ️ Step 3: No items to insert');
                             this.loadInvoices();
                             return of({
                                 ...updatedInvoice,
@@ -603,7 +577,7 @@ export class InvoiceService {
     }
 
     async debugInvoiceItems(invoiceId: string): Promise<void> {
-        console.log('🔍 DEBUG: Checking items for invoice:', invoiceId);
+        //console.log('🔍 DEBUG: Checking items for invoice:', invoiceId);
 
         const { data: existingItems, error } = await this.supabase.client
             .from('invoice_items')
@@ -616,14 +590,14 @@ export class InvoiceService {
             return;
         }
 
-        console.log('📊 Current items in database:', existingItems?.length || 0);
+        //console.log('📊 Current items in database:', existingItems?.length || 0);
         existingItems?.forEach((item, index) => {
-            console.log(`   Item ${index + 1}:`, {
+            /* console.log(`   Item ${index + 1}:`, {
                 id: item.id,
                 description: item.description,
                 quantity: item.quantity,
                 created_at: item.created_at
-            });
+            }); */
         });
     }
 

@@ -225,7 +225,7 @@ export class InvoiceFormComponent implements OnInit {
   }
 
   // Metodo per debug dei totali
-  debugTotals() {
+  /* debugTotals() {
     console.log('=== DEBUG TOTALI ===');
     console.log('Subtotal computed:', this.subtotal());
     console.log('Tax computed:', this.taxAmount());
@@ -241,7 +241,7 @@ export class InvoiceFormComponent implements OnInit {
       });
     });
   }
-
+ */
 
   private setupTotalCalculationEffect() {
     // Monitora i cambiamenti nel form array
@@ -482,9 +482,9 @@ export class InvoiceFormComponent implements OnInit {
     const tax = subtotal * (taxRate / 100);
     const total = subtotal + tax;
 
-    console.log(`Item ${index} calculation:`, {
+    /* console.log(`Item ${index} calculation:`, {
       quantity, unitPrice, taxRate, subtotal, tax, total
-    });
+    }); */
 
     item.get('total')?.setValue(total, { emitEvent: false });
 
@@ -624,7 +624,7 @@ export class InvoiceFormComponent implements OnInit {
     const formValue = this.invoiceForm.value;
 
     // 🔍 DEBUG: Aggiungi log per verificare i dati degli items
-    console.log('Form items before processing:', formValue.items);
+    //console.log('Form items before processing:', formValue.items);
 
     // Prepara gli items pulendo i dati non necessari
     const items: InvoiceItem[] = formValue.items.map((item: any, index: number) => {
@@ -639,7 +639,7 @@ export class InvoiceFormComponent implements OnInit {
       };
 
       // 🔍 DEBUG: Log ogni item processato
-      console.log(`Item ${index + 1}:`, processedItem);
+      //console.log(`Item ${index + 1}:`, processedItem);
 
       return processedItem;
     });
@@ -659,7 +659,7 @@ export class InvoiceFormComponent implements OnInit {
       items: items
     };
 
-    console.log('Final invoice data:', invoiceData);
+    //console.log('Final invoice data:', invoiceData);
 
     const operation$ = this.isEditMode() && this.currentInvoiceId()
       ? this.invoiceService.updateInvoice({ ...invoiceData, id: this.currentInvoiceId()! } as Invoice)

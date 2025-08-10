@@ -29,7 +29,7 @@ export class AuthService implements OnDestroy {
 
     // Ascolta i cambiamenti di stato dell'autenticazione di Supabase
     this.supabase.client.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      console.log('Auth event:', event, 'Session:', session);
+      //console.log('Auth event:', event, 'Session:', session);
       this._currentUser.set(session ? session.user : null);
       this._sessionLoaded.set(true); // Indica che la sessione è stata caricata
     });

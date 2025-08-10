@@ -58,8 +58,8 @@ export class DashboardComponent implements OnInit {
     // Carica fatture
     this.invoiceService.getInvoices().subscribe({
       next: invoices => {
-        console.log('📊 Dashboard - Fatture caricate:', invoices.length);
-        console.log('📊 Dashboard - Prima fattura esempio:', invoices[0]);
+        //console.log('📊 Dashboard - Fatture caricate:', invoices.length);
+        //console.log('📊 Dashboard - Prima fattura esempio:', invoices[0]);
 
         // Prendi le ultime 5 fatture per la sezione recenti
         this.recentInvoices.set(invoices.slice(0, 5));
@@ -91,7 +91,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private calculateInvoiceStats(invoices: Invoice[]) {
-    console.log('🧮 Dashboard - Inizio calcolo statistiche...');
+    //console.log('🧮 Dashboard - Inizio calcolo statistiche...');
 
     const today = new Date();
     const currentMonth = today.getMonth();
@@ -102,16 +102,16 @@ export class DashboardComponent implements OnInit {
     const totalRevenue = invoices
       .filter(inv => {
         const isValidStatus = ['paid', 'sent'].includes(inv.status);
-        console.log(`Fattura ${inv.invoice_number}: status=${inv.status}, valid=${isValidStatus}, total=${inv.total}`);
+        //console.log(`Fattura ${inv.invoice_number}: status=${inv.status}, valid=${isValidStatus}, total=${inv.total}`);
         return isValidStatus;
       })
       .reduce((sum, inv) => {
         const total = Number(inv.total) || 0;
-        console.log(`Aggiungendo ${total} al totale (era ${sum})`);
+        //console.log(`Aggiungendo ${total} al totale (era ${sum})`);
         return sum + total;
       }, 0);
 
-    console.log('💰 Revenue totale calcolato:', totalRevenue);
+    //console.log('💰 Revenue totale calcolato:', totalRevenue);
 
     // Calcola fatture in attesa (solo 'sent')
     const pendingInvoices = invoices.filter(inv => inv.status === 'sent').length;
@@ -126,7 +126,7 @@ export class DashboardComponent implements OnInit {
       dueDate.setHours(0, 0, 0, 0);
 
       const isOverdue = dueDate < todayReset;
-      console.log(`Fattura ${inv.invoice_number}: due=${inv.due_date}, overdue=${isOverdue}`);
+      //console.log(`Fattura ${inv.invoice_number}: due=${inv.due_date}, overdue=${isOverdue}`);
       return isOverdue;
     }).length;
 
@@ -138,7 +138,7 @@ export class DashboardComponent implements OnInit {
         const isThisMonth = invoiceDate.getMonth() === currentMonth &&
           invoiceDate.getFullYear() === currentYear;
 
-        console.log(`Fattura ${inv.invoice_number}: date=${inv.issue_date}, thisMonth=${isThisMonth}, status=${inv.status}`);
+        //console.log(`Fattura ${inv.invoice_number}: date=${inv.issue_date}, thisMonth=${isThisMonth}, status=${inv.status}`);
         return isValidStatus && isThisMonth;
       })
       .reduce((sum, inv) => {
@@ -146,7 +146,7 @@ export class DashboardComponent implements OnInit {
         return sum + total;
       }, 0);
 
-    console.log('📅 Revenue questo mese:', thisMonthRevenue);
+    //console.log('📅 Revenue questo mese:', thisMonthRevenue);
 
     const newStats = {
       totalInvoices: invoices.length,
@@ -157,7 +157,7 @@ export class DashboardComponent implements OnInit {
       thisMonthRevenue: Math.round(thisMonthRevenue * 100) / 100
     };
 
-    console.log('📊 Statistiche finali:', newStats);
+    //console.log('📊 Statistiche finali:', newStats);
     this.stats.set(newStats);
   }
 
@@ -274,7 +274,7 @@ export class DashboardComponent implements OnInit {
   }
 
   // 🔧 FIX 6: Metodi di debug per troubleshooting
-  debugStats() {
+  /* debugStats() {
     console.group('🐛 DEBUG Dashboard Stats');
     console.log('Current stats:', this.stats());
     console.log('Recent invoices:', this.recentInvoices());
@@ -290,6 +290,6 @@ export class DashboardComponent implements OnInit {
       });
     });
     console.groupEnd();
-  }
+  } */
 
 }

@@ -21,7 +21,7 @@ export const publicGuard: CanActivateFn = (route, state) => {
     take(1),
     tap(isPublicOnly => {
       if (!isPublicOnly) {
-        console.log('User already authenticated, redirecting to dashboard...');
+        //console.log('User already authenticated, redirecting to dashboard...');
         router.navigate(['/dashboard']);
       }
     }),
