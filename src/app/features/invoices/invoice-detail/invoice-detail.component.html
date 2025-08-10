@@ -39,24 +39,36 @@
                 <mat-icon>download</mat-icon>
                 <span>Scarica PDF</span>
             </button>
+            <button mat-menu-item (click)="exportToXML(invoice()!)" [disabled]="updating()">
+                <mat-icon>code</mat-icon>
+                <span>Esporta XML</span>
+            </button>
             <!-- <button mat-menu-item (click)="sendInvoice()" [disabled]="updating()">
                 <mat-icon>email</mat-icon>
                 <span>Invia via Email</span>
             </button> -->
+
             <mat-divider></mat-divider>
-            <button mat-menu-item [routerLink]="['/invoices', invoice()!.id, 'edit']" [disabled]="updating()">
+
+            <button mat-menu-item [routerLink]="['/invoices', invoice()!.id, 'edit']"
+                [disabled]="updating() || invoice()!.status === 'paid'"
+                [matTooltip]="invoice()!.status === 'paid' ? 'Non puoi modificare una fattura pagata' : ''">
                 <mat-icon>edit</mat-icon>
                 <span>Modifica</span>
             </button>
-            <button mat-menu-item (click)="duplicateInvoice()" [disabled]="updating()">
+            <button mat-menu-item (click)="duplicateInvoice()" [disabled]="updating() || invoice()!.status === 'paid'"
+                [matTooltip]="invoice()!.status === 'paid' ? 'Non puoi duplicare una fattura pagata' : ''">
                 <mat-icon>content_copy</mat-icon>
                 <span>Duplica</span>
             </button>
-            <button mat-menu-item (click)="deleteInvoice()" class="text-error" [disabled]="updating()">
+            <button mat-menu-item (click)="deleteInvoice()" class="text-error"
+                [disabled]="updating() || invoice()!.status === 'paid'"
+                [matTooltip]="invoice()!.status === 'paid' ? 'Non puoi eliminare una fattura pagata' : ''">
                 <mat-icon>delete</mat-icon>
                 <span>Elimina</span>
             </button>
         </mat-menu>
+
     </div>
 
     <!-- Invoice Content -->

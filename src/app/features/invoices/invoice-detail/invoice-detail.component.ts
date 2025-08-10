@@ -17,6 +17,8 @@ import { Invoice } from '../invoice.model';
 import { InvoiceService } from '../invoice.service';
 
 import { PdfService } from '../../../core/print/pdf.service';
+import { XmlExportService } from '../../../core/print/xml-export.service';
+
 import { ConfirmationDialogComponent } from '../../../shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
@@ -42,6 +44,7 @@ export class InvoiceDetailComponent implements OnInit {
   router = inject(Router);
   invoiceService = inject(InvoiceService);
   pdfService = inject(PdfService);
+  xmlService = inject(XmlExportService);
   dialog = inject(MatDialog);
   snackBar = inject(MatSnackBar);
 
@@ -116,6 +119,10 @@ export class InvoiceDetailComponent implements OnInit {
     return this.calculatedSubtotal() + this.calculatedTaxAmount();
   });
 
+  exportToXML(invoice: Invoice) {
+    this.xmlService.downloadInvoiceXML(invoice);
+  }
+
   private verifyTotalIntegrity(): boolean {
     const invoice = this.invoice();
     if (!invoice) return false;
@@ -140,7 +147,6 @@ export class InvoiceDetailComponent implements OnInit {
 
     return true;
   }
-
 
   getDaysToDeadline(): number {
     const invoice = this.invoice();
