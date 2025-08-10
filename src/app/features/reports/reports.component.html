@@ -1,36 +1,435 @@
-<div class="filters">
-    <label>
-        <input type="radio" name="filter" value="month" [(ngModel)]="selectedFilter" (change)="loadData()"> Mese
-        corrente
-    </label>
-    <label>
-        <input type="radio" name="filter" value="last30" [(ngModel)]="selectedFilter" (change)="loadData()"> Ultimi 30
-        giorni
-    </label>
-    <label>
-        <input type="radio" name="filter" value="custom" [(ngModel)]="selectedFilter" (change)="loadData()">
-        Personalizzato
-    </label>
-
-    <div *ngIf="selectedFilter === 'custom'">
-        <input type="date" [(ngModel)]="customFrom" (change)="loadData()">
-        <input type="date" [(ngModel)]="customTo" (change)="loadData()">
+<div class="reports-container animate-fade-in">
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-on-surface mb-2">Report e Statistiche</h1>
+            <p class="text-on-surface-variant">
+                Analisi dettagliata delle performance aziendali
+                <span class="ml-2 text-primary font-medium">{{ dateRangeLabel() }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2 mt-4 md:mt-0">
+            <button mat-raised-button color="primary" (click)="exportReport()" [disabled]="loading()">
+                <mat-icon>download</mat-icon>
+                Esporta Report
+            </button>
+            <button mat-icon-button (click)="loadData()" [disabled]="loading()" matTooltip="Aggiorna dati">
+                <mat-icon>refresh</mat-icon>
+            </button>
+        </div>
     </div>
-</div>
 
-<div class="stat-card">
-    <h3>Totale Fatturato</h3>
-    <p>{{ totalRevenue | currency:'EUR' }}</p>
-    <small *ngIf="prevPeriodRevenue">Periodo precedente: {{ prevPeriodRevenue | currency:'EUR' }}</small>
-</div>
+    <!-- Filters Section -->
+    <mat-card class="mb-6 surface-container">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Filtri Report</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Date Range Filter -->
+                <mat-form-field appearance="outline">
+                    <mat-label>Periodo</mat-label>
+                    <mat-select [value]="filters().dateRange" (selectionChange)="onDateRangeChange($event.value)">
+                        <mat-option value="thisMonth">Questo Mese</mat-option>
+                        <mat-option value="lastMonth">Mese Scorso</mat-option>
+                        <mat-option value="last3Months">Ultimi 3 Mesi</mat-option>
+                        <mat-option value="last6Months">Ultimi 6 Mesi</mat-option>
+                        <mat-option value="thisYear">Quest'Anno</mat-option>
+                        <mat-option value="lastYear">Anno Scorso</mat-option>
+                        <mat-option value="custom">Personalizzato</mat-option>
+                    </mat-select>
+                </mat-form-field>
 
-<div class="stat-card dim-graph">
-    <h3>Fatture per Stato</h3>
-    <canvas baseChart [data]="pieChartData" [options]="pieChartOptions" type="pie">
-    </canvas>
-</div>
+                <!-- Customer Filter -->
+                <mat-form-field appearance="outline">
+                    <mat-label>Cliente</mat-label>
+                    <mat-select [value]="filters().customerId" (selectionChange)="onCustomerChange($event.value)">
+                        <mat-option value="">Tutti i clienti</mat-option>
+                        @for (customer of customers(); track customer.id) {
+                        <mat-option [value]="customer.id">{{ customer.name }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
 
-<div class="stat-card">
-    <h3>Clienti Attivi</h3>
-    <p>{{ activeCustomers }}</p>
+                <!-- Status Filter -->
+                <mat-form-field appearance="outline">
+                    <mat-label>Stato</mat-label>
+                    <mat-select [value]="filters().status" (selectionChange)="onStatusChange($event.value)">
+                        <mat-option value="">Tutti gli stati</mat-option>
+                        <mat-option value="draft">Bozze</mat-option>
+                        <mat-option value="sent">Inviate</mat-option>
+                        <mat-option value="paid">Pagate</mat-option>
+                        <mat-option value="overdue">Scadute</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <!-- Refresh Button -->
+                <div class="flex items-end">
+                    <button mat-outlined-button (click)="loadData()" [disabled]="loading()" class="w-full h-14">
+                        <mat-icon>refresh</mat-icon>
+                        Aggiorna
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Date Range -->
+            @if (filters().dateRange === 'custom') {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <mat-form-field appearance="outline">
+                    <mat-label>Data inizio</mat-label>
+                    <input matInput [matDatepicker]="fromPicker" [value]="filters().customFrom"
+                        (dateChange)="filters.update(f => ({...f, customFrom: $event.value})); onCustomDateChange()">
+                    <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #fromPicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Data fine</mat-label>
+                    <input matInput [matDatepicker]="toPicker" [value]="filters().customTo"
+                        (dateChange)="filters.update(f => ({...f, customTo: $event.value})); onCustomDateChange()">
+                    <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #toPicker></mat-datepicker>
+                </mat-form-field>
+            </div>
+            }
+        </mat-card-content>
+    </mat-card>
+
+    @if (loading()) {
+    <!-- Loading State -->
+    <div class="flex justify-center items-center py-16">
+        <div class="text-center">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p class="text-on-surface-variant mt-4">Caricamento report...</p>
+        </div>
+    </div>
+    } @else {
+
+    <!-- Key Metrics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Revenue -->
+        <mat-card class="surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <mat-icon class="text-primary text-2xl">euro</mat-icon>
+                    </div>
+                    <div class="flex items-center gap-1" [class]="growthIndicators().revenue.color">
+                        <mat-icon class="text-sm">{{ growthIndicators().revenue.icon }}</mat-icon>
+                        <span class="text-sm font-medium">{{ formatPercentage(growthIndicators().revenue.value)
+                            }}</span>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    {{ formatCurrency(metrics().totalRevenue) }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">Fatturato Totale</p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                    Periodo precedente: {{ formatCurrency(metrics().prevPeriodRevenue) }}
+                </p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Total Invoices -->
+        <mat-card class="surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
+                        <mat-icon class="text-secondary text-2xl">receipt_long</mat-icon>
+                    </div>
+                    <div class="flex items-center gap-1" [class]="growthIndicators().invoices.color">
+                        <mat-icon class="text-sm">{{ growthIndicators().invoices.icon }}</mat-icon>
+                        <span class="text-sm font-medium">{{ formatPercentage(growthIndicators().invoices.value)
+                            }}</span>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">{{ metrics().totalInvoices }}</h3>
+                <p class="text-sm text-on-surface-variant">Fatture Create</p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                    Periodo precedente: {{ metrics().prevPeriodInvoices }}
+                </p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Average Invoice Value -->
+        <mat-card class="surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <mat-icon class="text-green-600 text-2xl">analytics</mat-icon>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">
+                    {{ formatCurrency(metrics().averageInvoiceValue) }}
+                </h3>
+                <p class="text-sm text-on-surface-variant">Valore Medio Fattura</p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                    Per {{ metrics().totalInvoices }} fatture
+                </p>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Active Customers -->
+        <mat-card class="surface-container">
+            <mat-card-content class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <mat-icon class="text-purple-600 text-2xl">groups</mat-icon>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-on-surface mb-1">{{ metrics().activeCustomers }}</h3>
+                <p class="text-sm text-on-surface-variant">Clienti Attivi</p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                    Top 5 generano {{ formatCurrency(top5Revenue) }}
+                </p>
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Revenue Trend Chart -->
+        <mat-card class="surface-container">
+            <mat-card-header>
+                <mat-card-title class="text-on-surface">Andamento Fatturato</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-6">
+                <div class="chart-container h-80">
+                    <canvas baseChart [data]="revenueChartData()" [options]="revenueChartOptions" type="line">
+                    </canvas>
+                </div>
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Status Distribution Chart -->
+        <mat-card class="surface-container">
+            <mat-card-header>
+                <mat-card-title class="text-on-surface">Distribuzione Stati</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-6">
+                <div class="chart-container h-80">
+                    <canvas baseChart [data]="statusChartData()" [options]="statusChartOptions" type="doughnut">
+                    </canvas>
+                </div>
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Detailed Tables Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Top Customers -->
+        <mat-card class="surface-container">
+            <mat-card-header>
+                <mat-card-title class="text-on-surface">Top Clienti</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-0">
+                @if (metrics().topCustomers.length > 0) {
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-surface-container-high">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Cliente
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Fatturato
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Fatture
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-outline-variant">
+                            @for (customer of metrics().topCustomers; track customer.name; let i = $index) {
+                            <tr class="hover:bg-surface-container-high">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <div
+                                            class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-primary font-bold text-sm">{{ i + 1 }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-on-surface">{{ customer.name }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="text-sm font-medium text-on-surface">{{ formatCurrency(customer.revenue)
+                                        }}</div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="text-sm text-on-surface">{{ customer.invoices }}</div>
+                                </td>
+                            </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                } @else {
+                <div class="text-center py-8">
+                    <mat-icon class="text-4xl text-on-surface-variant mb-2">people_outline</mat-icon>
+                    <p class="text-on-surface-variant">Nessun dato disponibile per il periodo selezionato</p>
+                </div>
+                }
+            </mat-card-content>
+        </mat-card>
+
+        <!-- Status Breakdown -->
+        <mat-card class="surface-container">
+            <mat-card-header>
+                <mat-card-title class="text-on-surface">Dettaglio Stati</mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-0">
+                @if (metrics().statusDistribution.length > 0) {
+                <div class="p-6">
+                    @for (status of metrics().statusDistribution; track status.status) {
+                    <div class="flex items-center justify-between py-3 border-b border-outline-variant last:border-b-0">
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 rounded-full mr-3"
+                                [style.background-color]="getStatusColor(status.status)">
+                            </div>
+                            <span class="text-sm font-medium text-on-surface">{{ status.label }}</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-on-surface">{{ status.count }}</div>
+                            <div class="text-xs text-on-surface-variant">
+                                {{ formatPercentage(status.percentage) }}
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+                } @else {
+                <div class="text-center py-8">
+                    <mat-icon class="text-4xl text-on-surface-variant mb-2">donut_large</mat-icon>
+                    <p class="text-on-surface-variant">Nessun dato disponibile</p>
+                </div>
+                }
+            </mat-card-content>
+        </mat-card>
+    </div>
+
+    <!-- Monthly Trend Table -->
+    @if (metrics().monthlyTrend.length > 1) {
+    <mat-card class="surface-container mt-8">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Trend Mensile Dettagliato</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-0">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-surface-container-high">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                Mese
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                Fatturato
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                Fatture
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                Media/Fattura
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-outline-variant">
+                        @for (month of metrics().monthlyTrend; track month.month) {
+                        <tr class="hover:bg-surface-container-high">
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-on-surface">{{ month.month }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="text-sm font-medium text-on-surface">{{ formatCurrency(month.revenue) }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="text-sm text-on-surface">{{ month.invoices }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="text-sm text-on-surface">
+                                    {{ month.invoices > 0 ? formatCurrency(month.revenue / month.invoices) : '€0,00' }}
+                                </div>
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </mat-card-content>
+    </mat-card>
+    }
+
+    <!-- Export Summary -->
+    <mat-card class="surface-container mt-8">
+        <mat-card-header>
+            <mat-card-title class="text-on-surface">Riepilogo Periodo</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-primary mb-2">
+                        {{ formatCurrency(metrics().totalRevenue) }}
+                    </div>
+                    <div class="text-sm text-on-surface-variant">Fatturato Totale</div>
+                    <div class="flex items-center justify-center mt-1 gap-1" [class]="growthIndicators().revenue.color">
+                        <mat-icon class="text-sm">{{ growthIndicators().revenue.icon }}</mat-icon>
+                        <span class="text-xs">{{ formatPercentage(growthIndicators().revenue.value) }} vs periodo
+                            precedente</span>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-secondary mb-2">
+                        {{ metrics().totalInvoices }}
+                    </div>
+                    <div class="text-sm text-on-surface-variant">Fatture Create</div>
+                    <div class="flex items-center justify-center mt-1 gap-1"
+                        [class]="growthIndicators().invoices.color">
+                        <mat-icon class="text-sm">{{ growthIndicators().invoices.icon }}</mat-icon>
+                        <span class="text-xs">{{ formatPercentage(growthIndicators().invoices.value) }} vs periodo
+                            precedente</span>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600 mb-2">
+                        {{ formatCurrency(metrics().averageInvoiceValue) }}
+                    </div>
+                    <div class="text-sm text-on-surface-variant">Valore Medio Fattura</div>
+                    <div class="text-xs text-on-surface-variant mt-1">
+                        {{ metrics().activeCustomers }} clienti attivi
+                    </div>
+                </div>
+            </div>
+
+            <mat-divider class="my-6"></mat-divider>
+
+            <div class="text-center">
+                <p class="text-sm text-on-surface-variant mb-4">
+                    Report generato il {{ currentDate | date:'dd/MM/yyyy HH:mm' }} per il periodo {{ dateRangeLabel() }}
+                </p>
+                <div class="flex justify-center gap-2">
+                    <button mat-outlined-button (click)="exportReport()">
+                        <mat-icon>download</mat-icon>
+                        Esporta Dati
+                    </button>
+                    <button mat-outlined-button (click)="loadData()">
+                        <mat-icon>refresh</mat-icon>
+                        Aggiorna Report
+                    </button>
+                </div>
+            </div>
+        </mat-card-content>
+    </mat-card>
+
+    }
 </div>
