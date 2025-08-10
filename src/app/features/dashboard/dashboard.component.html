@@ -33,7 +33,7 @@
                 <h3 class="text-2xl font-bold text-on-surface mb-1">
                     €{{ stats().totalRevenue | number:'1.2-2' }}
                 </h3>
-                <p class="text-sm text-on-surface-variant">Fatturato totale</p>
+                <p class="text-sm text-on-surface-variant">Fatturato saldato</p>
                 @if (stats().thisMonthRevenue > 0) {
                 <p class="text-xs text-green-600 mt-1">
                     €{{ stats().thisMonthRevenue | number:'1.2-2' }} questo mese
@@ -201,7 +201,7 @@
             <mat-card-content class="p-6 mt-4">
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
-                        <span class="text-on-surface-variant">Fatturato:</span>
+                        <span class="text-on-surface-variant">Fatturato saldato:</span>
                         <span class="font-bold text-lg text-primary">€{{ stats().thisMonthRevenue | number:'1.2-2'
                             }}</span>
                     </div>

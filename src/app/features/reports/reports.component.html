@@ -65,7 +65,7 @@
 
                 <!-- Refresh Button -->
                 <div class="flex items-end">
-                    <button mat-outlined-button (click)="loadData()" [disabled]="loading()" class="w-full h-14">
+                    <button mat-button (click)="loadData()" [disabled]="loading()" class="mb-7">
                         <mat-icon>refresh</mat-icon>
                         Aggiorna
                     </button>
@@ -78,7 +78,7 @@
                 <mat-form-field appearance="outline">
                     <mat-label>Data inizio</mat-label>
                     <input matInput [matDatepicker]="fromPicker" [value]="filters().customFrom"
-                        (dateChange)="filters.update(f => ({...f, customFrom: $event.value})); onCustomDateChange()">
+                        (dateChange)="onCustomFromDateChange($event.value)">
                     <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
                     <mat-datepicker #fromPicker></mat-datepicker>
                 </mat-form-field>
@@ -86,7 +86,7 @@
                 <mat-form-field appearance="outline">
                     <mat-label>Data fine</mat-label>
                     <input matInput [matDatepicker]="toPicker" [value]="filters().customTo"
-                        (dateChange)="filters.update(f => ({...f, customTo: $event.value})); onCustomDateChange()">
+                        (dateChange)="onCustomToDateChange($event.value)">
                     <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
                     <mat-datepicker #toPicker></mat-datepicker>
                 </mat-form-field>
@@ -123,7 +123,7 @@
                 <h3 class="text-2xl font-bold text-on-surface mb-1">
                     {{ formatCurrency(metrics().totalRevenue) }}
                 </h3>
-                <p class="text-sm text-on-surface-variant">Fatturato Totale</p>
+                <p class="text-sm text-on-surface-variant">Fatturato Saldato</p>
                 <p class="text-xs text-on-surface-variant mt-1">
                     Periodo precedente: {{ formatCurrency(metrics().prevPeriodRevenue) }}
                 </p>
@@ -234,7 +234,7 @@
                                 </th>
                                 <th
                                     class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
-                                    Fatturato
+                                    Fatturato saldato
                                 </th>
                                 <th
                                     class="px-6 py-3 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
@@ -379,7 +379,7 @@
                     <div class="text-2xl font-bold text-primary mb-2">
                         {{ formatCurrency(metrics().totalRevenue) }}
                     </div>
-                    <div class="text-sm text-on-surface-variant">Fatturato Totale</div>
+                    <div class="text-sm text-on-surface-variant">Fatturato Saldato</div>
                     <div class="flex items-center justify-center mt-1 gap-1" [class]="growthIndicators().revenue.color">
                         <mat-icon class="text-sm">{{ growthIndicators().revenue.icon }}</mat-icon>
                         <span class="text-xs">{{ formatPercentage(growthIndicators().revenue.value) }} vs periodo
@@ -418,11 +418,11 @@
                     Report generato il {{ currentDate | date:'dd/MM/yyyy HH:mm' }} per il periodo {{ dateRangeLabel() }}
                 </p>
                 <div class="flex justify-center gap-2">
-                    <button mat-outlined-button (click)="exportReport()">
+                    <button mat-button (click)="exportReport()">
                         <mat-icon>download</mat-icon>
                         Esporta Dati
                     </button>
-                    <button mat-outlined-button (click)="loadData()">
+                    <button mat-button (click)="loadData()">
                         <mat-icon>refresh</mat-icon>
                         Aggiorna Report
                     </button>

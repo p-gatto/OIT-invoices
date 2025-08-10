@@ -277,6 +277,16 @@ export class ReportsComponent implements OnInit {
     }
   }
 
+  onCustomFromDateChange(date: Date | null) {
+    this.filters.update(f => ({ ...f, customFrom: date! }));
+    this.onCustomDateChange();
+  }
+
+  onCustomToDateChange(date: Date | null) {
+    this.filters.update(f => ({ ...f, customTo: date! }));
+    this.onCustomDateChange();
+  }
+
   private async loadInvoicesForPeriod(from: Date, to: Date) {
     return new Promise<any[]>((resolve, reject) => {
       this.invoiceService.getInvoicesByDateRange(
