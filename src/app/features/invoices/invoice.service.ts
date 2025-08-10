@@ -35,21 +35,23 @@ export class InvoiceService {
             this.supabase.client
                 .from('invoices')
                 .select(`
-                    *,
-                    customers!invoices_customer_id_fkey(
-                        id,
-                        name,
-                        email,
-                        phone,
-                        address,
-                        tax_code,
-                        vat_number
-                    )
-                `)
+                *,
+                customers!invoices_customer_id_fkey(
+                    id,
+                    name,
+                    email,
+                    phone,
+                    address,
+                    tax_code,
+                    vat_number
+                )
+            `)
                 .order('created_at', { ascending: false })
         ).pipe(
             switchMap(({ data: invoicesData, error: invoicesError }) => {
                 if (invoicesError) throw invoicesError;
+
+                console.log('🔍 Service - Raw invoices from DB:', invoicesData?.length || 0);
 
                 // Per ogni fattura, carica gli items separatamente
                 const invoicesWithItems$ = (invoicesData || []).map(invoice =>
@@ -57,29 +59,38 @@ export class InvoiceService {
                         this.supabase.client
                             .from('invoice_items')
                             .select(`
-                                *,
-                                products(
-                                    id,
-                                    name,
-                                    description,
-                                    category,
-                                    unit
-                                )
-                            `)
+                            *,
+                            products(
+                                id,
+                                name,
+                                description,
+                                category,
+                                unit
+                            )
+                        `)
                             .eq('invoice_id', invoice.id)
                             .order('created_at')
                     ).pipe(
                         map(({ data: itemsData, error: itemsError }) => {
                             if (itemsError) {
                                 console.error(`Error loading items for invoice ${invoice.id}:`, itemsError);
-                                return { ...invoice, customer: invoice.customers, items: [] };
+                                return this.normalizeInvoiceData({ ...invoice, customer: invoice.customers, items: [] });
                             }
 
-                            return {
+                            const normalizedInvoice = this.normalizeInvoiceData({
                                 ...invoice,
                                 customer: invoice.customers,
                                 items: itemsData || []
-                            } as Invoice;
+                            });
+
+                            console.log(`📋 Invoice ${normalizedInvoice.invoice_number}:`, {
+                                subtotal: normalizedInvoice.subtotal,
+                                tax_amount: normalizedInvoice.tax_amount,
+                                total: normalizedInvoice.total,
+                                status: normalizedInvoice.status
+                            });
+
+                            return normalizedInvoice as Invoice;
                         })
                     )
                 );
@@ -92,6 +103,12 @@ export class InvoiceService {
                 return forkJoin(invoicesWithItems$);
             }),
             map((invoices: Invoice[]) => {
+                console.log('✅ Service - Processed invoices:', invoices.length);
+
+                // Calcola totali di debug
+                const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+                console.log('💰 Service - Total revenue calculated:', totalRevenue);
+
                 this.invoicesSignal.set(invoices);
                 return invoices;
             }),
@@ -102,6 +119,157 @@ export class InvoiceService {
             })
         );
     }
+
+    // 🔧 Metodo helper per normalizzare i dati delle fatture
+    private normalizeInvoiceData(invoice: any): Invoice {
+        return {
+            ...invoice,
+            // Assicura che i totali siano sempre numeri
+            subtotal: this.ensureNumber(invoice.subtotal),
+            tax_amount: this.ensureNumber(invoice.tax_amount),
+            total: this.ensureNumber(invoice.total),
+
+            // Normalizza gli items
+            items: (invoice.items || []).map((item: any) => ({
+                ...item,
+                quantity: this.ensureNumber(item.quantity),
+                unit_price: this.ensureNumber(item.unit_price),
+                tax_rate: this.ensureNumber(item.tax_rate),
+                total: this.ensureNumber(item.total)
+            }))
+        };
+    }
+
+    // 🔧 Metodo helper per assicurare conversione numerica
+    private ensureNumber(value: any): number {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+            const parsed = parseFloat(value);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+    }
+
+    // 🔧 Metodo migliorato per le statistiche dashboard
+    getInvoiceStats(): Observable<{
+        total: number;
+        draft: number;
+        sent: number;
+        paid: number;
+        overdue: number;
+        totalRevenue: number;
+        pendingRevenue: number;
+        thisMonthRevenue: number;
+    }> {
+        return this.getInvoices().pipe(
+            map(invoices => {
+                console.group('📊 InvoiceService - Calcolo statistiche');
+
+                const today = new Date();
+                const currentMonth = today.getMonth();
+                const currentYear = today.getFullYear();
+
+                // Conta fatture per status
+                const statusCounts = {
+                    draft: 0,
+                    sent: 0,
+                    paid: 0,
+                    overdue: 0
+                };
+
+                // Calcola revenues
+                let totalRevenue = 0;
+                let pendingRevenue = 0;
+                let thisMonthRevenue = 0;
+
+                // Identifica fatture scadute e calcola totali
+                const processedInvoices = invoices.map(inv => {
+                    const total = this.ensureNumber(inv.total);
+
+                    // Determina se è scaduta
+                    let finalStatus = inv.status;
+                    if (inv.status === 'sent' && inv.due_date) {
+                        const dueDate = new Date(inv.due_date);
+                        const todayReset = new Date();
+                        todayReset.setHours(0, 0, 0, 0);
+                        dueDate.setHours(0, 0, 0, 0);
+
+                        if (dueDate < todayReset) {
+                            finalStatus = 'overdue';
+                        }
+                    }
+
+                    // Conta per status
+                    if (finalStatus in statusCounts) {
+                        statusCounts[finalStatus as keyof typeof statusCounts]++;
+                    }
+
+                    // Calcola revenue totale (pagate + inviate)
+                    if (['paid', 'sent'].includes(finalStatus)) {
+                        totalRevenue += total;
+                    }
+
+                    // Calcola revenue in attesa (solo inviate, non scadute)
+                    if (finalStatus === 'sent') {
+                        pendingRevenue += total;
+                    }
+
+                    // Calcola revenue del mese corrente
+                    const invoiceDate = new Date(inv.issue_date);
+                    if (['paid', 'sent'].includes(finalStatus) &&
+                        invoiceDate.getMonth() === currentMonth &&
+                        invoiceDate.getFullYear() === currentYear) {
+                        thisMonthRevenue += total;
+                    }
+
+                    console.log(`${inv.invoice_number}: ${finalStatus}, €${total}`);
+                    return { ...inv, finalStatus, total };
+                });
+
+                const stats = {
+                    total: invoices.length,
+                    draft: statusCounts.draft,
+                    sent: statusCounts.sent,
+                    paid: statusCounts.paid,
+                    overdue: statusCounts.overdue,
+                    totalRevenue: Math.round(totalRevenue * 100) / 100,
+                    pendingRevenue: Math.round(pendingRevenue * 100) / 100,
+                    thisMonthRevenue: Math.round(thisMonthRevenue * 100) / 100
+                };
+
+                console.log('📊 Final stats:', stats);
+                console.groupEnd();
+
+                return stats;
+            })
+        );
+    }
+
+    // 🔧 Metodo di debug per verificare i dati
+    /* debugInvoiceData(): void {
+        this.getInvoices().pipe(take(1)).subscribe(invoices=> {
+            console.group('🐛 DEBUG Invoice Data');
+
+            console.log(`Total invoices loaded: ${invoices.length}`);
+
+            invoices.forEach((invoice, index) => {
+                console.log(`Invoice ${index + 1}:`, {
+                    number: invoice.invoice_number,
+                    status: invoice.status,
+                    subtotal: invoice.subtotal,
+                    tax_amount: invoice.tax_amount,
+                    total: invoice.total,
+                    items_count: invoice.items?.length || 0,
+                    customer: invoice.customer?.name || 'No customer'
+                });
+            });
+
+            const totalSum = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+            console.log(`Total revenue sum: €${totalSum}`);
+
+            console.groupEnd();
+        });
+    } */
 
     getInvoiceById(id: string): Observable<Invoice | null> {
         return from(
@@ -403,7 +571,6 @@ export class InvoiceService {
         );
     }
 
-
     async debugInvoiceItems(invoiceId: string): Promise<void> {
         console.log('🔍 DEBUG: Checking items for invoice:', invoiceId);
 
@@ -620,54 +787,6 @@ export class InvoiceService {
             catchError(error => {
                 console.error('Error loading invoices for customer:', error);
                 return of([]);
-            })
-        );
-    }
-
-    // Ottieni statistiche fatture
-    getInvoiceStats(): Observable<{
-        total: number;
-        draft: number;
-        sent: number;
-        paid: number;
-        overdue: number;
-        totalRevenue: number;
-        pendingRevenue: number;
-        thisMonthRevenue: number;
-    }> {
-        return this.getInvoices().pipe(
-            map(invoices => {
-                const today = new Date();
-                const currentMonth = today.getMonth();
-                const currentYear = today.getFullYear();
-
-                // Identifica fatture scadute
-                const overdueInvoices = invoices.filter(inv => {
-                    if (inv.status !== 'sent' || !inv.due_date) return false;
-                    return this.utilityService.isDateInPast(inv.due_date);
-                });
-
-                return {
-                    total: invoices.length,
-                    draft: invoices.filter(inv => inv.status === 'draft').length,
-                    sent: invoices.filter(inv => inv.status === 'sent').length,
-                    paid: invoices.filter(inv => inv.status === 'paid').length,
-                    overdue: overdueInvoices.length,
-                    totalRevenue: invoices
-                        .filter(inv => inv.status === 'paid')
-                        .reduce((sum, inv) => sum + inv.total, 0),
-                    pendingRevenue: invoices
-                        .filter(inv => inv.status === 'sent')
-                        .reduce((sum, inv) => sum + inv.total, 0),
-                    thisMonthRevenue: invoices
-                        .filter(inv => {
-                            const invoiceDate = new Date(inv.issue_date);
-                            return inv.status === 'paid' &&
-                                invoiceDate.getMonth() === currentMonth &&
-                                invoiceDate.getFullYear() === currentYear;
-                        })
-                        .reduce((sum, inv) => sum + inv.total, 0)
-                };
             })
         );
     }

@@ -12,11 +12,11 @@
     <div class="flex justify-between items-start mb-8">
         <div>
             <div class="flex items-center gap-2 mb-4">
-                <button mat-icon-button (click)="goBack()" [disabled]="updating()">
+                <button mat-icon-button matTooltip="Elenco fatture" (click)="goBack()" [disabled]="updating()">
                     <mat-icon>arrow_back</mat-icon>
                 </button>
-                <h1 class="text-3xl font-bold text-on-surface">{{ invoice()!.invoice_number }}</h1>
-                <mat-chip [class]="getStatusClass(invoice()!.status)">
+                <h1 class="text-3xl font-bold text-on-surface ml-4 mr-4">{{ invoice()!.invoice_number }}</h1>
+                <mat-chip matTooltip="Stato fattura" [class]="getStatusClass(invoice()!.status)">
                     {{ getStatusLabel(invoice()!.status) }}
                 </mat-chip>
             </div>
@@ -29,17 +29,21 @@
         </div>
 
         <div class="flex gap-2">
-            <button mat-outlined-button [matMenuTriggerFor]="actionsMenu" [disabled]="updating()">
-                <mat-icon>more_vert</mat-icon>
-                Azioni
-            </button>
-            <button mat-raised-button color="primary" (click)="downloadPDF()" [disabled]="updating()">
-                <mat-icon>download</mat-icon>
-                Scarica PDF
+            <button mat-icon-button matTooltip="Azioni" [matMenuTriggerFor]="actionsMenu" [disabled]="updating()">
+                <mat-icon>widgets</mat-icon>
             </button>
         </div>
 
         <mat-menu #actionsMenu="matMenu">
+            <button mat-menu-item (click)="downloadPDF()" [disabled]="updating()">
+                <mat-icon>download</mat-icon>
+                <span>Scarica PDF</span>
+            </button>
+            <!-- <button mat-menu-item (click)="sendInvoice()" [disabled]="updating()">
+                <mat-icon>email</mat-icon>
+                <span>Invia via Email</span>
+            </button> -->
+            <mat-divider></mat-divider>
             <button mat-menu-item [routerLink]="['/invoices', invoice()!.id, 'edit']" [disabled]="updating()">
                 <mat-icon>edit</mat-icon>
                 <span>Modifica</span>
@@ -48,11 +52,6 @@
                 <mat-icon>content_copy</mat-icon>
                 <span>Duplica</span>
             </button>
-            <button mat-menu-item (click)="sendInvoice()" [disabled]="updating()">
-                <mat-icon>email</mat-icon>
-                <span>Invia via Email</span>
-            </button>
-            <mat-divider></mat-divider>
             <button mat-menu-item (click)="deleteInvoice()" class="text-error" [disabled]="updating()">
                 <mat-icon>delete</mat-icon>
                 <span>Elimina</span>
@@ -320,34 +319,6 @@
                 </mat-card-content>
             </mat-card>
 
-            <!-- Quick Actions -->
-            <mat-card class="surface-container">
-                <mat-card-header>
-                    <mat-card-title class="text-on-surface">Azioni Rapide</mat-card-title>
-                </mat-card-header>
-                <mat-card-content class="p-4">
-                    <div class="space-y-2">
-                        <button mat-outlined-button class="w-full" (click)="downloadPDF()" [disabled]="updating()">
-                            <mat-icon>picture_as_pdf</mat-icon>
-                            Scarica PDF
-                        </button>
-                        <button mat-outlined-button class="w-full" (click)="sendInvoice()" [disabled]="updating()">
-                            <mat-icon>email</mat-icon>
-                            Invia Email
-                        </button>
-                        <button mat-outlined-button class="w-full" (click)="printInvoice()" [disabled]="updating()">
-                            <mat-icon>print</mat-icon>
-                            Stampa
-                        </button>
-                        <button mat-outlined-button class="w-full" [routerLink]="['/invoices', invoice()!.id, 'edit']"
-                            [disabled]="updating()">
-                            <mat-icon>edit</mat-icon>
-                            Modifica
-                        </button>
-                    </div>
-                </mat-card-content>
-            </mat-card>
-
             <!-- Customer Quick Info -->
             @if (invoice()!.customer) {
             <mat-card class="surface-container">
@@ -368,7 +339,7 @@
                             }
                         </div>
                     </div>
-                    <button mat-outlined-button class="w-full" [routerLink]="['/customers']"
+                    <button mat-raised-button color="primary" class="w-full" [routerLink]="['/customers']"
                         [queryParams]="{customerId: invoice()!.customer?.id}" [disabled]="updating()">
                         <mat-icon>visibility</mat-icon>
                         Vedi altre fatture

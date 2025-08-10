@@ -18,6 +18,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
+
 
 import { Customer } from '../../customers/customer.model';
 
@@ -45,7 +47,8 @@ import { CustomerService } from '../../customers/customer.service';
     MatDividerModule,
     MatAutocompleteModule,
     MatDialogModule,
-    MatChipsModule
+    MatChipsModule,
+    MatTooltipModule
   ],
   templateUrl: './invoice-form.component.html',
   styleUrl: './invoice-form.component.scss'
