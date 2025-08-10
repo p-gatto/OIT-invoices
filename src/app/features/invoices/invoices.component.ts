@@ -15,10 +15,12 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDividerModule } from "@angular/material/divider";
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { Invoice } from './invoice.model';
 import { InvoiceService } from './invoice.service';
 import { ConfirmationDialogComponent } from '../../shared/components/confirmation-dialog/confirmation-dialog.component';
+import { PdfService } from '../../core/print/pdf.service';
 
 @Component({
   selector: 'app-invoices',
@@ -36,7 +38,8 @@ import { ConfirmationDialogComponent } from '../../shared/components/confirmatio
     MatMenuModule,
     MatDialogModule,
     MatDividerModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule
   ],
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss'
@@ -44,6 +47,7 @@ import { ConfirmationDialogComponent } from '../../shared/components/confirmatio
 export class InvoicesComponent implements OnInit {
 
   invoiceService = inject(InvoiceService);
+  pdfService = inject(PdfService);
   dialog = inject(MatDialog);
   snackBar = inject(MatSnackBar);
   router = inject(Router);
@@ -301,9 +305,18 @@ export class InvoicesComponent implements OnInit {
     });
   }
 
-  downloadPDF(invoice: Invoice) {
+  downloadPDF(pInvoice: Invoice) {
     // PDF download logic
-    this.snackBar.open('Download PDF in corso...', 'Chiudi', { duration: 3000 });
+    const invoice = pInvoice;
+    if (invoice) {
+      try {
+        this.pdfService.generateInvoicePDF(invoice);
+        this.snackBar.open('PDF generato con successo', 'Chiudi', { duration: 3000 });
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        this.snackBar.open('Errore durante la generazione del PDF', 'Chiudi', { duration: 3000 });
+      }
+    }
   }
 
   deleteInvoice(invoice: Invoice) {

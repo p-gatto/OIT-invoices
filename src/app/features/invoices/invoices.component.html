@@ -314,23 +314,28 @@
                 <mat-icon>visibility</mat-icon>
                 <span>Visualizza</span>
             </button>
-            <button mat-menu-item (click)="editInvoice(invoice.id)">
-                <mat-icon>edit</mat-icon>
-                <span>Modifica</span>
-            </button>
-            <button mat-menu-item (click)="duplicateInvoice(invoice)">
-                <mat-icon>content_copy</mat-icon>
-                <span>Duplica</span>
-            </button>
             <button mat-menu-item (click)="downloadPDF(invoice)">
                 <mat-icon>download</mat-icon>
                 <span>Scarica PDF</span>
             </button>
             <mat-divider></mat-divider>
-            <button mat-menu-item (click)="deleteInvoice(invoice)" class="text-error">
+            <button mat-menu-item (click)="editInvoice(invoice.id)" [disabled]="invoice.status === 'paid'"
+                [matTooltip]="invoice.status === 'paid' ? 'Non puoi modificare una fattura pagata' : ''">
+                <mat-icon>edit</mat-icon>
+                <span>Modifica</span>
+            </button>
+            <button mat-menu-item (click)="duplicateInvoice(invoice)" [disabled]="invoice.status === 'paid'"
+                [matTooltip]="invoice.status === 'paid' ? 'Non puoi duplicare una fattura pagata' : ''">
+                <mat-icon>content_copy</mat-icon>
+                <span>Duplica</span>
+            </button>
+            <button mat-menu-item (click)="deleteInvoice(invoice)" class="text-error"
+                [disabled]="invoice.status === 'paid'"
+                [matTooltip]="invoice.status === 'paid' ? 'Non puoi eliminare una fattura pagata' : ''">
                 <mat-icon>delete</mat-icon>
                 <span>Elimina</span>
             </button>
         </ng-template>
     </mat-menu>
+
 </div>
