@@ -20,6 +20,12 @@
             "outputPath": "dist/oit-invoices",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "allowedCommonJsDependencies": [
+              "core-js",
+              "raf",
+              "rgbcolor",
+              "html2canvas"
+            ],
             "polyfills": [
               "zone.js"
             ],
