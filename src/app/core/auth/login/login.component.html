@@ -1,9 +1,11 @@
 <div class="login-container flex items-center justify-center min-h-screen bg-surface">
-    <mat-card class="surface-container w-full max-w-md p-6 shadow-lg rounded-lg">
-        <mat-card-header class="text-center block mb-6">
-            <mat-icon class="text-primary text-6xl mb-2">account_circle</mat-icon>
-            <mat-card-title class="text-3xl font-bold text-on-surface">Login</mat-card-title>
-            <mat-card-subtitle class="text-on-surface-variant">Accedi al tuo account</mat-card-subtitle>
+    <mat-card class="w-full max-w-md p-6 shadow-lg rounded-lg">
+        <mat-card-header class="mb-6">
+            <mat-card-title-group>
+                <mat-card-title>Login</mat-card-title>
+                <mat-card-subtitle>Accedi al tuo account</mat-card-subtitle>
+                <img mat-card-sm-image src="assets/login.png" />
+            </mat-card-title-group>
         </mat-card-header>
         <mat-card-content>
             <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-6">
@@ -42,11 +44,11 @@
                     }
                 </button>
             </form>
-            <div class="text-center mt-6">
+            <!-- <div class="text-center mt-6">
                 <p class="text-on-surface-variant">Non hai un account?
                     <a routerLink="/register" class="text-primary hover:underline">Registrati qui</a>
                 </p>
-            </div>
+            </div> -->
         </mat-card-content>
     </mat-card>
 </div>
